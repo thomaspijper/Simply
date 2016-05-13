@@ -1,4 +1,4 @@
-# Simply - simulating polymerizations
+# Simply: simulating polymerizations
 
 --Work in progress--
 
