@@ -21,7 +21,7 @@ Limitations that should be emphasized are:
 
 ### Documentation
 
-Documentation is available on the project wiki ([linke](https://github.com/thomaspijper/Simply/wiki)).
+Documentation is available on the project wiki ([link](https://github.com/thomaspijper/Simply/wiki)).
 
 ### Citing
 If you’re using Simply for research, please cite it as follows:
