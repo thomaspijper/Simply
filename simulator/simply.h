@@ -26,7 +26,11 @@ typedef double react_prob;
 typedef int    length;
 typedef double ptime;
 typedef double rateCoefficient;
+#ifdef LONGCHAINSUPPORT
 typedef unsigned int chainLen;
+#else
+typedef unsigned short chainLen;
+#endif
 
 // stores a number of particles
 typedef unsigned long long pcount; // 64-bit version
