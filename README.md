@@ -1,5 +1,7 @@
 ### Simply: a SIMulator for PoLYmerizations
 
+_Current version is 0.98beta_
+
 Simply is a kinetic Monte Carlo simulator for polymerization reactions. It is based on _paraPolySim_ by Barner-Kowollik and coworkers and consists of two separate programs. The first (‘generator’) is Python program that interprets the user-provided input file and translates it into a C header file. The second (‘simulator’) is the actual simulation engine, written in C. The C code, when combined with the generated header file, compiles into a executable that is highly optimized for the system that is to be simulated.
 
 One important goal of the program is to maximize computational efficiency, which is achieved through a) detailed knowledge of the simulation already being available at compile time, b) an efficient parallelization scheme (which utilizes MPI), and c) a code design that minimizes the amount of operations needed for each iteration.
