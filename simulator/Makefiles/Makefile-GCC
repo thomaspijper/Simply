@@ -1,14 +1,14 @@
 RM = rm -f
 CC = mpicc
-CFLAGS = -std=c99 -Wall -O3 -fomit-frame-pointer -ffast-math -march=native
-LDFLAGS = -lm 
+CFLAGS = -std=c99 -Wall -O3 -fomit-frame-pointer -ffast-math -msse3 -march=native
+LDFLAGS = -lm
 
-paraPolySim: paraPolysystem.c paraPolysystem.o random.o genpolymer.h polysystem.h Makefile
-	$(CC) $(CFLAGS) -o paraPolysystem paraPolysystem.o random.o $(LDFLAGS)
+simply: simply.c simply.o dSFMT.o genpolymer.h simply.h Makefile
+	$(CC) $(CFLAGS) -o simply simply.o dSFMT.o $(LDFLAGS)
 
 clean:
-	$(RM) *.o paraPolysystem *.csv
+	$(RM) *.o simply *.csv
 
-random.o: mtrandom.c mtrandom.h
-	$(CC) $(CFLAGS) -c -o random.o mtrandom.c
+dSFMT.o: dSFMT.c dSFMT.h dSFMT-common.h dSFMT-params.h dSFMT-params19937.h
+	$(CC) $(CFLAGS) -c -o dSFMT.o dSFMT.c
 
