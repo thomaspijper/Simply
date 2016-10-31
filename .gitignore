@@ -251,5 +251,8 @@ paket-files/
 .idea/
 *.sln.iml
 
+# Plain text files
+*.txt
+
 # Simulation results
 *.csv
