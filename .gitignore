@@ -7,6 +7,11 @@
 *.userosscache
 *.sln.docstates
 
+# Project and solution files
+*.sln
+*.vcxproj*
+*.filters
+
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
@@ -251,10 +256,21 @@ paket-files/
 .idea/
 *.sln.iml
 
+# Python specific files
+*.pyc
+/generator/__pycache__
+*.pyproj
+
+# Compilation/compiled files
+/simulator/Makefile
+*.exe
+
 # Simulation cases
 genpolymer.h
 generator/current\ header\ files/
-generator/example\ input\ and\ header\ files/
+
+generator/future\ example\ input\ and\ header\ files/
+
 generator/original\ headerfiles\ (paraPolySim)/
 
 # Plain text files
@@ -265,3 +281,7 @@ generator/original\ headerfiles\ (paraPolySim)/
 
 # Batch files
 *.bat
+
+# WinMerge files
+*.WinMerge
+*.bak
