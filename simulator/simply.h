@@ -18,38 +18,34 @@
 
 #include "genpolymer.h"
 #include <inttypes.h>
+#if defined(__GNUC__)
+  #include <sys/time.h>
+#endif
 
 #define MAX_DATA_FILE 1000
+#define RATES_VEC_SIZE 10
 typedef double probability;
 typedef double react_prob;
-
-typedef int    length;
 typedef double ptime;
 typedef double rateCoefficient;
 #ifdef LONGCHAINSUPPORT
-typedef unsigned int chainLen;
+  typedef unsigned int chainLen;
+  #define CHAINLENLIMIT UINT_MAX
 #else
-typedef unsigned short chainLen;
+  typedef short chainLen;
+  #define CHAINLENLIMIT SHRT_MAX
 #endif
-
-// stores a number of particles
-typedef unsigned long long pcount; // 64-bit version
-//typedef unsigned long pcount;  // 32-bit version
+typedef unsigned long long pcount; // stores a number of particles
 
 typedef int molecule_spec;
 
 typedef struct {
-  molecule_spec mspec;
-  length        len; /* only relevant in case of Poly */  
-} molecule;
-
-typedef struct {
-  rateCoefficient rc;
-  molecule_spec arg_ms1;
-  molecule_spec arg_ms2;
-  molecule_spec res_ms1;
-  molecule_spec res_ms2;    
-  double energy;
+	rateCoefficient rc;
+	molecule_spec arg_ms1;
+	molecule_spec arg_ms2;
+	molecule_spec res_ms1;
+	molecule_spec res_ms2;    
+	double energy;
 } reaction;
 
 typedef struct {
@@ -63,7 +59,7 @@ typedef struct {
   /* all arrays have the same length: one entry per
    * type of molecule in the system
    */
-	int64_t *molCnts;
+	long long *molCnts;
 } specmap;
 
 typedef struct {
@@ -71,21 +67,26 @@ typedef struct {
   pcount *mwd_tree;
 } mwdStore;
 
-#define RATES_VEC_SIZE 10
-
+/* Linux: use the timeval struct to store seconds and microseconds
+   Windows: use LARGE_INTEGER to store the stamps of QueryPerformanceCounter (divide by frequency later) */
 typedef struct {
-	int64_t tv_sec;
-	int64_t tv_usec;
-} timeval;
-
-typedef struct {
+#if defined(__GNUC__)
 	timeval start_t;
 	timeval end_t;
+#elif defined(_MSC_VER)
+	LARGE_INTEGER start_t;
+	LARGE_INTEGER end_t;
+#endif
 } Timer;
 
-typedef struct {
+/* Windows: stores values of QueryPerformanceFrequency */ 
+#if defined(_MSC_VER)
+  LARGE_INTEGER frequency;
+#endif
+
+  typedef struct {
 	chainLen *mols;
-	unsigned long long int maxMolecules;
+	pcount maxMolecules;
 } MoleculeList;
 
 typedef struct {
@@ -102,9 +103,7 @@ typedef struct {
   unsigned long long synchEvents;
 
 #ifdef CALCMOMENTSOFDIST
-  unsigned long long zerothMoment;
-  unsigned long long firstMoment;
-  unsigned long long secondMoment;
+  unsigned long long momentDist[3];
 #endif
 #ifdef CALCFREEVOLUME
   double		freeVolumeFraction;
@@ -146,6 +145,21 @@ typedef struct {
 } sysState;
 
 
+// Stores the header of the blocks of data that are communicated.
+typedef struct {
+	int 			stateTooBig;		// Flag indicating that size of 
+										//  state has become too large.
+	ptime           time;				// Time of system
+	double			deltatemp;			// Temperature deviation of the system
+	int 			noMoreReactions;	// Counts number of nodes that 
+										//  have no events possible.
+	pcount 			globalAllMonomer;	// Counts number of monomer 
+										//  particles that have been 
+										//  consumed and that still exist 
+										//  as monomer.
+} StatePacket;
+
+
 #define MOLTYPE(MSPEC) \
   (MSPEC<MAXSIMPLE?SIMPLE:(MSPEC<MAXPOLY?POLY:(MSPEC<NO_MOL?COMPLEX:NO_MOL)))
 
@@ -155,42 +169,20 @@ typedef struct {
 
 
 #define initMol(MOL,MOLSPEC,LEN) {	\
-  (MOL).mspec   = MOLSPEC;	        \
-  (MOL).len     = (LEN);}	        \
+  (MOL).mspec   = MOLSPEC;			\
+  (MOL).len     = (LEN);}
 
 
-#define isPolyMol(MOL) 	                \
-  (MOLTYPE(MOL) == POLY)                \
+#define isSimpleMol(MOL)	(MOLTYPE(MOL) == SIMPLE)
+#define isPolyMol(MOL)		(MOLTYPE(MOL) == POLY)
+#define isComplexMol(MOL)	(MOLTYPE(MOL) == COMPLEX)
 
-#define isComplexMol(MOL) 	                \
-  (MOLTYPE(MOL) == COMPLEX)                \
-
-
-#define isSimpleMol(MOL)                \
-    (MOLTYPE(MOL) == SIMPLE)            \
+#define reactToSpecInd1(REACT) REACT.arg_ms1       
+#define reactToSpecInd2(REACT) REACT.arg_ms2       
 
 
-#define isPolySpec(MOL) 	        \
-  (SPECTYPE(MOL) == POLY)               \
-
-#define isSimpleSpec(MOL)               \
-    (MOLTYPE(MOL) == SIMPLE)            \
-
-#define isComplexSpec(MOL)				\
-	(MOLTYPE(MOL) == COMPLEX)
-
-
-#define reactToSpecInd1(REACT)          \
-  REACT.arg_ms1       
-
-#define reactToSpecInd2(REACT)          \
-  REACT.arg_ms2       
-
- 
 void print_state();
 
 inline const char * name(int index);
 inline const char * rname(int index);
 void print_reaction(int reaction_index);
-
-

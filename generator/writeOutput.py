@@ -100,13 +100,6 @@ class writeOutput(object):
     def syncMode(self, file, generalDict):
     # Write sync parameters
 
-        if generalDict['syncmethod'] == 'simtime':
-            syncmode = 0
-        elif generalDict['syncmethod'] == 'events':
-            syncmode = 1
-
-        line = '#define SYNCH_MODE {0}\n'.format(syncmode)
-        self.writeSingleString(file, line)
         line = '#define SYNCH_TIME_INTERVAL {0}\n'.format(generalDict['syncsimtime'])
         self.writeSingleString(file, line)
         line = '#define SYNCH_EVENTS_INTERVAL {0}\n'.format(generalDict['syncevents'])
@@ -201,11 +194,18 @@ class writeOutput(object):
         return True
 
 
-    def CONCENTRATION(self, file, moleculesList):
+    def CONCENTRATION(self, file, generalDict, moleculesList):
     # Write the starting temperature of the reaction mixture to the file
 
-        concentration = self.calcConcentration(moleculesList)
-        line = '#define CONCENTRATION {0:.8e}\n'.format(Decimal(concentration))
+        count = 0
+        monomerList = generalDict['monomernames']
+        for i in range(len(monomerList)):
+            for j in range(len(moleculesList)):
+                if monomerList[i] == moleculesList[j][1]:
+                    count = count + moleculesList[j][2]
+                    break
+
+        line = '#define CONCENTRATION {0:.8e}\n'.format(Decimal(count))
         self.writeSingleString(file, line)
         return True
 
@@ -260,7 +260,7 @@ class writeOutput(object):
     # Indicate whether the conversion should be recalculated on each iteration
 
         for i in range(len(ratesList)):
-            if ratesList[i][1] in ['fps','aps']:
+            if ratesList[i][1] in ['fp','ap','fpr','apr']:
                 line = '#define CALCMOMENTSOFDIST\n'
                 self.writeSingleString(file, line)
                 break
@@ -365,12 +365,12 @@ class writeOutput(object):
     # We're going to define an update of the reaction probability tree for each reaction case
     
         # First calculate the number of probability tree leaves
-        i = 1
+        exp = 1
         while True:
-            leavesNo = 2 ** i
+            leavesNo = 2 ** exp
             if leavesNo >= len(reactionsList):
                 break
-            i = i + 1
+            exp += 1
 
         # Write the beginning of the first line
         startFirstLine = '#define TREE_UPDATE_BODY {'
@@ -378,7 +378,9 @@ class writeOutput(object):
 
         # We're going to make a case for each reaction
         for i in range(len(reactionsList)):
-            indicesAffectedReactions = []
+            indicesAffectedReactions = [] # For storing a list of reactions that require updating
+            
+            # Write the first line
             if i == 0:
                 line = 'case {0}:\\\n{1}'.format(reactionsList[i][0], len(startFirstLine)*' ')
                 self.writeSingleString(file, line)
@@ -560,12 +562,22 @@ class writeOutput(object):
     # We're going to define how rate constants need to be updated
 
         particlecount = generalDict['particlecount']
+        simulateheating = generalDict['simulateheating']
         concentration = self.calcConcentration(moleculesList)
         startFirstLine = '#define RATES_UPDATE_BODY {'
         body = startFirstLine
-        updateCases = ['a','fd','ad','fps','aps']
-
-
+        updateCases = [] # Types of rates which require updating because of 
+                         #   1) temperature dependence ('a', 'fd', 'ad', 'fp', 'ap', 'fpr', 'apr'), though only when SIMULATEHEATING is defined
+                         #   2) conversion dependence ('fd', 'ad', 'fp', 'ap', 'fpr', 'apr')
+                         #   3) dependence upon a second reaction process ('fpr', 'apr')
+        
+        # Populate updateCases
+        if simulateheating != 0:
+            updateCases.extend(['a', 'fd', 'ad', 'fp', 'ap', 'fpr', 'apr'])
+        updateCases.extend(['fd', 'ad', 'fp', 'ap', 'fpr', 'apr'])
+        updateCases.extend(['fpr', 'apr'])
+        updateCases = list(set(updateCases)) # Remove duplicates
+        
         # Go through the list of reactions
         for i in range(len(reactionsList)):
 
@@ -758,15 +770,19 @@ class writeOutput(object):
 
     def compileRateString(self, rate, particlecount, concentration, reaction, index):
         
+        bimolCorStr = ''
+
         # Describe a rate with a fixed rate coefficient
         if rate[1] == 'f':
+            
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 rc = rate[2]
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 rc = Decimal(rate[2]) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
                     rc = rc * Decimal(2)
-            rcline = 'state.reactions[{0}].rc = {1:.8e};'.format(index, float(rc))
+            rcline = 'state.reactions[{0}].rc = {1}{2:.8e};'.format(index, bimolCorStr, float(rc))
 
         # Describe a rate with Arrhenius parameters
         elif rate[1] == 'a':
@@ -775,16 +791,18 @@ class writeOutput(object):
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 pass
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
                     preexp = preexp * Decimal(2)
-            rcline = 'state.reactions[{0}].rc = {1:.8e} * exp({2:.8e} / state.temp);'.format(index, float(preexp), float(exp))
+            rcline = 'state.reactions[{0}].rc = {1}{2:.8e} * exp({3:.8e} / state.temp);'.format(index, bimolCorStr, float(preexp), float(exp))
 
         # Describe a rate with a fixed rate coefficient and damping
         elif rate[1] == 'fd':
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 rc = rate[2]
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 rc = Decimal(rate[2]) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
                     rc = rc * Decimal(2)
@@ -794,7 +812,7 @@ class writeOutput(object):
             c2t1 = rate[6]
             c3t0 = rate[7]
             c3t1 = rate[8]
-            rcline = 'state.reactions[{0}].rc = {1:.8e}'.format(index, float(rc))
+            rcline = 'state.reactions[{0}].rc = {1}{2:.8e}'.format(index, bimolCorStr, float(rc))
             rcline = rcline + ' * exp(-1.0 * ( ({0:.4e}+{1:.4e}*state.temp)*state.conversion + ({2:.4e}+{3:.4e}*state.temp)*state.conversion*state.conversion + ({4:.4e}+{5:.4e}*state.temp)*state.conversion*state.conversion*state.conversion ) );'.format(c1t0,c1t1,c2t0,c2t1,c3t0,c3t1)
 
         # Describe a rate with Arrhenius parameters and damping
@@ -804,6 +822,7 @@ class writeOutput(object):
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 pass
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
                     preexp = preexp * Decimal(2)
@@ -813,11 +832,11 @@ class writeOutput(object):
             c2t1 = rate[7]
             c3t0 = rate[8]
             c3t1 = rate[9]
-            rcline = 'state.reactions[{0}].rc = {1:.8e} * exp({2:.8e} / state.temp)'.format(index, float(preexp), float(exp))
+            rcline = 'state.reactions[{0}].rc = {1}{2:.8e} * exp({3:.8e} / state.temp)'.format(index, bimolCorStr, float(preexp), float(exp))
             rcline = rcline + ' * exp(-1.0 * ( ({0:.4e}+{1:.4e}*state.temp)*state.conversion + ({2:.4e}+{3:.4e}*state.temp)*state.conversion*state.conversion + ({4:.4e}+{5:.4e}*state.temp)*state.conversion*state.conversion*state.conversion ) );'.format(c1t0,c1t1,c2t0,c2t1,c3t0,c3t1)
 
         # Describe a rate with a fixed rate coefficient and diffusion considered by a simple 'parallel' encounter pair model
-        elif rate[1] == 'fps':
+        elif rate[1] == 'fp':
             # All parameters
             kc = rate[2]
             kd0 = rate[3]
@@ -827,6 +846,7 @@ class writeOutput(object):
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 pass
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 kc = Decimal(kc) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
@@ -838,24 +858,24 @@ class writeOutput(object):
                 l0pow_line = '1'
                 l1pow_line = '1'
             elif A == int(A):      # Speed up power calculation when possible
-                l0pow_line = '(state.zerothMoment'
-                l1pow_line = '(state.firstMoment'
+                l0pow_line = '((double)state.momentDist[0]'
+                l1pow_line = '((double)state.momentDist[1]'
                 for a in range(1, int(A)):
-                    l0pow_line = l0pow_line + '*state.zerothMoment'
-                    l1pow_line = l1pow_line + '*state.firstMoment'
+                    l0pow_line = l0pow_line + '*(double)state.momentDist[0]'
+                    l1pow_line = l1pow_line + '*(double)state.momentDist[1]'
                 l0pow_line = l0pow_line + ')'
                 l1pow_line = l1pow_line + ')'
             else:
-                l0pow_line = 'pow(state.zerothMoment, {0})'.format(A)
-                l1pow_line = 'pow(state.firstMoment, {0})'.format(A)
+                l0pow_line = 'pow((double)state.momentDist[0], {0})'.format(A)
+                l1pow_line = 'pow((double)state.momentDist[1], {0})'.format(A)
 
             num = '{0:.8e}*{1:.8e}*{2}'.format(float(kc), float(kd0), l0pow_line)
             denom_pt1 = '{0:.8e}*{1}*exp({2}/state.freeVolumeFraction)'.format(float(kc), l1pow_line, B)
             denom_pt2 = '{0:.8e}*{1}'.format(float(kd0), l0pow_line)
-            rcline = 'state.reactions[{0}].rc = ({1}) / ( ({2}) + ({3}));'.format(index, num, denom_pt1, denom_pt2)
+            rcline = 'state.reactions[{0}].rc = {1}({2}) / ( ({3}) + ({4}));'.format(index, bimolCorStr, num, denom_pt1, denom_pt2)
 
         # Describe a rate with a Arrhenius parameters and diffusion considered by a simple 'parallel' encounter pair model
-        elif rate[1] == 'aps':
+        elif rate[1] == 'ap':
             # All parameters
             preexp = rate[2]
             exp = Decimal(rate[3]) * Decimal(1000) / Decimal(self.gasconstant)   # Caution: negative sign has been omitted as rewriting (1 / k = 1 / kc + 1 / kd) removes it
@@ -866,6 +886,7 @@ class writeOutput(object):
             if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
                 pass
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
                 if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
@@ -877,21 +898,96 @@ class writeOutput(object):
                 l0pow_line = '1'
                 l1pow_line = '1'
             elif A == int(A):      # Speed up power calculation when possible
-                l0pow_line = '(state.zerothMoment'
-                l1pow_line = '(state.firstMoment'
+                l0pow_line = '((double)state.momentDist[0]'
+                l1pow_line = '((double)state.momentDist[1]'
                 for a in range(1, int(A)):
-                    l0pow_line = l0pow_line + '*state.zerothMoment'
-                    l1pow_line = l1pow_line + '*state.firstMoment'
+                    l0pow_line = l0pow_line + '*(double)state.momentDist[0]'
+                    l1pow_line = l1pow_line + '*(double)state.momentDist[1]'
                 l0pow_line = l0pow_line + ')'
                 l1pow_line = l1pow_line + ')'
             else:
-                l0pow_line = 'pow(state.zerothMoment, {0})'.format(A)
-                l1pow_line = 'pow(state.firstMoment, {0})'.format(A)
+                l0pow_line = 'pow((double)state.momentDist[0], {0})'.format(A)
+                l1pow_line = 'pow((double)state.momentDist[1], {0})'.format(A)
 
             num = '{0:.8e}*{1:.8e}*{2}'.format(float(preexp), float(kd0), l0pow_line)
             denom_pt1 = '{0:.8e}*{1}*exp({2}/state.freeVolumeFraction)'.format(float(preexp), l1pow_line, B)
             denom_pt2 = '{0:.8e}*{1}*exp({2:.8e} / state.temp)'.format(float(kd0), l0pow_line, float(exp))
-            rcline = 'state.reactions[{0}].rc = ({1}) / ( ({2}) + ({3}));'.format(index, num, denom_pt1, denom_pt2)
+            rcline = 'state.reactions[{0}].rc = {1}({2}) / ( ({3}) + ({4}));'.format(index, bimolCorStr, num, denom_pt1, denom_pt2)
+
+        # Describe a rate with a fixed rate coefficient and diffusion considered by a 'parallel' encounter pair model + 1 additional term
+        elif rate[1] == 'fpr':
+            # All parameters
+            kc = rate[2]
+            kd0 = rate[3]
+            A = rate[4]
+            B = rate[5]
+            extRate = rate[6]
+            species = rate[7]
+
+            if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
+                pass
+            else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
+                kc = Decimal(kc) * Decimal(concentration) / Decimal(particlecount)
+                kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
+                extRate = Decimal(extRate) * Decimal(concentration) / Decimal(particlecount)
+                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                    kc = kc * Decimal(2)
+                    extRate = kd0 * Decimal(2)
+                    extRate = extRate * Decimal(2)
+
+            # Write lambda powers
+            if A == 0:
+                rn = '1'
+            elif A == int(A):      # Speed up power calculation when possible
+                rn = '((double)state.momentDist[0]/(double)state.momentDist[1])'
+                for a in range(1, int(A)):
+                    rn = rn + '*((double)state.momentDist[0]/(double)state.momentDist[1])'
+            else:
+                rn = 'pow(((double)state.momentDist[0]/(double)state.momentDist[1]), {0})'.format(A)
+
+            kd = '({0:.8e}*{1}*exp(-{2}/state.freeVolumeFraction))'.format(float(kd0), rn, B)
+            kdr = '({0:.8e}*(state.ms_cnts[{1}]/AVOGADRO/state.volume))'.format(float(extRate), species)
+            rcline = 'state.reactions[{0}].rc = {1}(1 / ((1/({2:.8e})) + (1/({3}+{4}))));'.format(index, bimolCorStr, kc, kd, kdr)
+
+        # Describe a rate with a Arrhenius parameters and diffusion considered by a 'parallel' encounter pair model + 1 additional term
+        elif rate[1] == 'apr':
+            # All parameters
+            preexp = rate[2]
+            exp = Decimal(-1) * Decimal(rate[3]) * Decimal(1000) / Decimal(self.gasconstant)
+            kd0 = rate[4]
+            A = rate[5]
+            B = rate[6]
+            extRatePreexp = rate[7]
+            extRateExp = Decimal(-1) * Decimal(rate[8]) * Decimal(1000) / Decimal(self.gasconstant)
+            species = rate[9]
+
+            if reaction[3] == '': # Unimolecular reaction, no rate adjustment needed
+                pass
+            else: # Bimolecular reaction, so we need to adjust the rate coefficient
+                bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
+                preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
+                kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
+                extRatePreexp = Decimal(extRatePreexp) * Decimal(concentration) / Decimal(particlecount)
+                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                    preexp = preexp * Decimal(2)
+                    kd0 = kd0 * Decimal(2)
+                    extRatePreexp = extRatePreexp * Decimal(2)
+
+            # Write lambda powers
+            if A == 0:
+                rn = '1'
+            elif A == int(A):      # Speed up power calculation when possible
+                rn = '((double)state.momentDist[0]/(double)state.momentDist[1])'
+                for a in range(1, int(A)):
+                    rn = rn + '*((double)state.momentDist[0]/(double)state.momentDist[1])'
+            else:
+                rn = 'pow(((double)state.momentDist[0]/(double)state.momentDist[1]), {0})'.format(A)
+
+            kc = '({0:.8e} * exp({1:.8e} / state.temp))'.format(float(preexp),float(exp))
+            kd = '({0:.8e}*{1}*exp(-{2}/state.freeVolumeFraction))'.format(float(kd0), rn, B)
+            kdr = '({0:.8e} * exp({1:.8e} / state.temp)*(state.ms_cnts[{2}]/AVOGADRO/state.volume))'.format(float(extRatePreexp), float(extRateExp), species)
+            rcline = 'state.reactions[{0}].rc = {1}(1 / ((1/({2})) + (1/({3}+{4}))));'.format(index, bimolCorStr, kc, kd, kdr)
 
         return rcline        
 

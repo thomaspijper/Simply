@@ -1,10 +1,10 @@
 RM = rm -f
 CC = mpicc
 CFLAGS = -std=c99 -Wall -O3 -fomit-frame-pointer -ffast-math -msse3 -march=native
-LDFLAGS = -lm
+LDFLAGS = -lm -lrt
 
-simply: simply.c simply.o dSFMT.o genpolymer.h simply.h Makefile
-	$(CC) $(CFLAGS) -o simply simply.o dSFMT.o $(LDFLAGS)
+simply: simply.c simply.o dSFMT.o argparse.o genpolymer.h simply.h minunit.h Makefile
+	$(CC) $(CFLAGS) -o simply simply.o dSFMT.o argparse.o $(LDFLAGS)
 
 clean:
 	$(RM) *.o simply *.csv
@@ -12,3 +12,5 @@ clean:
 dSFMT.o: dSFMT.c dSFMT.h dSFMT-common.h dSFMT-params.h dSFMT-params19937.h
 	$(CC) $(CFLAGS) -c -o dSFMT.o dSFMT.c
 
+argparse.o: argparse.c argparse.h
+	$(CC) $(CFLAGS) -c -o argparse.o argparse.c

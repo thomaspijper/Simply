@@ -479,8 +479,9 @@ void dsfmt_gen_rand_all(dsfmt_t *dsfmt) {
  * returns the pointer to the aligned memory block.
  */
 void dsfmt_fill_array_close1_open2(dsfmt_t *dsfmt, double array[], int size) {
-    assert(size % 2 == 0);
-    assert(size >= DSFMT_N64);
+	// These checks are already performed in simply.c
+	// assert(size % 2 == 0);
+    // assert(size >= DSFMT_N64);
     gen_rand_array_c1o2(dsfmt, (w128_t *)array, size / 2);
 }
 
@@ -497,8 +498,9 @@ void dsfmt_fill_array_close1_open2(dsfmt_t *dsfmt, double array[], int size) {
  * see also \sa fill_array_close1_open2()
  */
 void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size) {
-    assert(size % 2 == 0);
-    assert(size >= DSFMT_N64);
+	// These checks are already performed in simply.c
+	// assert(size % 2 == 0);
+	// assert(size >= DSFMT_N64);
     gen_rand_array_o0c1(dsfmt, (w128_t *)array, size / 2);
 }
 
@@ -515,8 +517,9 @@ void dsfmt_fill_array_open_close(dsfmt_t *dsfmt, double array[], int size) {
  * see also \sa fill_array_close1_open2()
  */
 void dsfmt_fill_array_close_open(dsfmt_t *dsfmt, double array[], int size) {
-    assert(size % 2 == 0);
-    assert(size >= DSFMT_N64);
+	// These checks are already performed in simply.c
+	// assert(size % 2 == 0);
+	// assert(size >= DSFMT_N64);
     gen_rand_array_c0o1(dsfmt, (w128_t *)array, size / 2);
 }
 
@@ -533,8 +536,9 @@ void dsfmt_fill_array_close_open(dsfmt_t *dsfmt, double array[], int size) {
  * see also \sa fill_array_close1_open2()
  */
 void dsfmt_fill_array_open_open(dsfmt_t *dsfmt, double array[], int size) {
-    assert(size % 2 == 0);
-    assert(size >= DSFMT_N64);
+	// These checks are already performed in simply.c
+	// assert(size % 2 == 0);
+	// assert(size >= DSFMT_N64);
     gen_rand_array_o0o1(dsfmt, (w128_t *)array, size / 2);
 }
 

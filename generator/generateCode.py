@@ -56,9 +56,15 @@ header = """/*
 
 # Visual Studio compiler needs this
 _MCS_VER = """#if defined(_MSC_VER)
-#include <windows.h>
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
 #endif
 \n"""
+
+def getOut(outputfile, deletionFlag):
+    if deletionFlag == True and os.path.isfile(outputfile):
+        os.remove(outputfile)
+    sys.exit()
 
 def main():
     # Start with defining the output file
@@ -98,13 +104,24 @@ def main():
         sys.exit()
 
     # Retreive parameters while performing input checks
-
     generalDict = read.readGeneral(inputfile)
+    if generalDict == -1:
+        getOut(outputfile, args.f)
     moleculesList = read.readMolecules(inputfile, generalDict)
+    if moleculesList == -1:
+        getOut(outputfile, args.f)
     ratesList = read.readRateCoeffs(inputfile, generalDict, moleculesList)
+    if ratesList == -1:
+        getOut(outputfile, args.f)
     reactionsList = read.readReactions(inputfile, moleculesList, ratesList)
+    if reactionsList == -1:
+        getOut(outputfile, args.f)
     enthalpiesList = read.readEnthalpies(inputfile, generalDict, reactionsList)
+    if enthalpiesList == -1:
+        getOut(outputfile, args.f)
     freeVolumeDict = read.readFreeVolume(inputfile, generalDict, ratesList)
+    if freeVolumeDict == -1:
+        getOut(outputfile, args.f)
 
     if args.v == True:
         print('\nGeneral input:')
@@ -147,7 +164,7 @@ def main():
     write.molecules(outputfile,moleculesList)
     write.reactions(outputfile,reactionsList)
     write.NO_OF_REACTIONS(outputfile,reactionsList)
-    write.CONCENTRATION(outputfile,moleculesList)
+    write.CONCENTRATION(outputfile,generalDict,moleculesList)
     write.BASETEMP(outputfile,generalDict)
     write.STARTTEMP(outputfile,generalDict)
     write.SIMULATEHEATING(outputfile,generalDict)
