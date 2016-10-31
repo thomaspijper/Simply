@@ -251,6 +251,9 @@ paket-files/
 .idea/
 *.sln.iml
 
+# Simulation cases
+genpolymer.h
+
 # Plain text files
 *.txt
 
