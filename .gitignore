@@ -253,9 +253,15 @@ paket-files/
 
 # Simulation cases
 genpolymer.h
+generator/current\ header\ files/
+generator/example\ input\ and\ header\ files/
+generator/original\ headerfiles\ (paraPolySim)/
 
 # Plain text files
 *.txt
 
 # Simulation results
 *.csv
+
+# Batch files
+*.bat
