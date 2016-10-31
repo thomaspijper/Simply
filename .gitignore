@@ -261,16 +261,14 @@ paket-files/
 /generator/__pycache__
 *.pyproj
 
-# Compilation/compiled files
+# Compilation files / compiled files
 /simulator/Makefile
 *.exe
 
 # Simulation cases
 genpolymer.h
 generator/current\ header\ files/
-
 generator/future\ example\ input\ and\ header\ files/
-
 generator/original\ headerfiles\ (paraPolySim)/
 
 # Plain text files
