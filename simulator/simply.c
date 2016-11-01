@@ -2491,7 +2491,7 @@ void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
    as the code is not written modular. We'll have to test only what we can. */  
 
 void test_setup() {
-
+	
 }
 
 void test_teardown() {
