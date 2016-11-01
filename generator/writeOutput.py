@@ -145,20 +145,30 @@ class writeOutput(object):
         return True
 
 
-    def ARMS_INIT(self, file, moleculesList):
-    # Compile a list containing the maximum number of arms for each species
-        list = []
+    def arms(self, file, moleculesList):
+    # Compile an array containing the maximum number of arms for each species.
+    # Also, determine the the maximum arm number and total arm number
+
+        array = []
+        maxArms = 1
         for i in range(len(moleculesList)):
             if moleculesList[i][0] in ['simple','poly']:
-                list.append(1)
+                array.append(1)
             elif moleculesList[i][0] == 'complex':
-                list.append(moleculesList[i][2])
-
-        line = '#define ARMS_INIT {{{0}}}\n'.format(str(list).strip('[]'))
+                array.append(moleculesList[i][2])
+                if moleculesList[i][2] > maxArms:
+                    maxArms = moleculesList[i][2]
+        totalArms = sum(array)
+                
+        line = '#define ARMS_INIT {{{0}}}\n'.format(str(array).strip('[]'))
+        self.writeSingleString(file, line)
+        line = '#define MAX_ARMS {0}\n'.format(maxArms)
+        self.writeSingleString(file, line)
+        line = '#define TOTAL_ARMS {0}\n'.format(totalArms)
         self.writeSingleString(file, line)
         return True
 
-
+        
     def molecules(self, file, moleculesList):
     # Print a line for each molecular species, end one line for each general type
         number = 0
@@ -481,19 +491,6 @@ class writeOutput(object):
         return True
  
    
-    def MAX_ARMS(self, file, reactionsList):
-    # Write the maximum number of arms
-
-        maxArms = 1
-        for i in range(len(reactionsList)):
-            if reactionsList[i][0] == 'complex' and reactionsList[i][2] > maxArms:
-                maxArms = reactionsList[i][2]
-
-        line = '#define MAX_ARMS {0}\n'.format(maxArms)
-        self.writeSingleString(file, line)
-        return True
- 
-
     def REACTIONS_INIT(self, file, generalDict, moleculesList, reactionsList, ratesList, enthalpiesList):
     # We're going to define reactants, products, and rate coefficient for each reaction
 

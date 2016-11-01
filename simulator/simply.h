@@ -29,22 +29,20 @@ typedef double react_prob;
 typedef double ptime;
 typedef double rateCoefficient;
 #ifdef LONGCHAINSUPPORT
-  typedef unsigned int chainLen;
-  #define CHAINLENLIMIT UINT_MAX
+typedef unsigned chainLen;
+#define CHAINLENLIMIT UINT_MAX
 #else
-  typedef short chainLen;
-  #define CHAINLENLIMIT SHRT_MAX
+typedef short chainLen;
+#define CHAINLENLIMIT SHRT_MAX
 #endif
 typedef unsigned long long pcount; // stores a number of particles
 
-typedef int molecule_spec;
-
 typedef struct {
 	rateCoefficient rc;
-	molecule_spec arg_ms1;
-	molecule_spec arg_ms2;
-	molecule_spec res_ms1;
-	molecule_spec res_ms2;    
+	int arg_ms1;
+	int arg_ms2;
+	int res_ms1;
+	int res_ms2;    
 	double energy;
 } reaction;
 
@@ -54,13 +52,6 @@ typedef struct {
 	int maxIx;
 	int ix;
 } TimesVals;
-
-typedef struct {
-  /* all arrays have the same length: one entry per
-   * type of molecule in the system
-   */
-	long long *molCnts;
-} specmap;
 
 typedef struct {
   int     maxEntries;   /* max number of entries in leaves */
@@ -98,12 +89,12 @@ typedef struct {
   ptime			synchTime;
   Timer			wallTime;
 
-  unsigned long long events;
-  unsigned long long nextSynchEvents;
-  unsigned long long synchEvents;
+  long long events;
+  long long nextSynchEvents;
+  long long synchEvents;
 
 #ifdef CALCMOMENTSOFDIST
-  unsigned long long momentDist[3];
+  pcount momentDist[3];
 #endif
 #ifdef CALCFREEVOLUME
   double		freeVolumeFraction;
@@ -148,41 +139,20 @@ typedef struct {
 // Stores the header of the blocks of data that are communicated.
 typedef struct {
 	int 			stateTooBig;		// Flag indicating that size of 
-										//  state has become too large.
+										//    state has become too large.
 	ptime           time;				// Time of system
 	double			deltatemp;			// Temperature deviation of the system
 	int 			noMoreReactions;	// Counts number of nodes that 
-										//  have no events possible.
+										//    have no events possible.
 	pcount 			globalAllMonomer;	// Counts number of monomer 
-										//  particles that have been 
-										//  consumed and that still exist 
-										//  as monomer.
+										//    particles that have been 
+										//    consumed and that still exist 
+										//    as monomer.
 } StatePacket;
-
-
-#define MOLTYPE(MSPEC) \
-  (MSPEC<MAXSIMPLE?SIMPLE:(MSPEC<MAXPOLY?POLY:(MSPEC<NO_MOL?COMPLEX:NO_MOL)))
-
-#define SPECTYPE(MOLS) \
-  (((MOLS)<MAXSIMPLE)?SIMPLE:(((MOLS)<MAXPOLY)?POLY:((MOLS)<NO_MOL)?COMPLEX:NO_MOL))
-
-
-
-#define initMol(MOL,MOLSPEC,LEN) {	\
-  (MOL).mspec   = MOLSPEC;			\
-  (MOL).len     = (LEN);}
-
-
-#define isSimpleMol(MOL)	(MOLTYPE(MOL) == SIMPLE)
-#define isPolyMol(MOL)		(MOLTYPE(MOL) == POLY)
-#define isComplexMol(MOL)	(MOLTYPE(MOL) == COMPLEX)
-
-#define reactToSpecInd1(REACT) REACT.arg_ms1       
-#define reactToSpecInd2(REACT) REACT.arg_ms2       
 
 
 void print_state();
 
-inline const char * name(int index);
-inline const char * rname(int index);
+inline const char *name(int index);
+inline const char *rname(int index);
 void print_reaction(int reaction_index);
