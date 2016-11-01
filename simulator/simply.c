@@ -156,7 +156,6 @@ int myid = -1;
 void print_kinetic_model(void);
 void monomerAudit(const char *str);
 void print_state(void);
-pcount check_tree(int no_of_leaves, int levelSize, int offset, pcount *mwd, int spec_ind);
        
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
@@ -334,13 +333,6 @@ INLINE void adjustTree(int spec_ind, mwdStore  *mwd, int leave_ind, int diff) {
 		mwd->mwd_tree[ind] += diff;
 		levelSize *= 2;
 	}
-
-#if defined(DEBUG)
-	//	printf("adjustMolCnt(%d, %d, %d)...\n",spec_ind,leave_ind,diff);
-	//	printf("check_tree running on %s\n", name(spec_ind));
-	//	dumpTree(&state.mwds[spec_ind]);
-//	check_tree(mwd->maxEntries, 1, 0, mwd->mwd_tree, spec_ind);
-#endif
 }
 
 /* Add 'diff' molecules of chain length (leave_ind + 1) of type
@@ -1152,44 +1144,6 @@ void print_reaction(int reaction_index) {
         printf("+ %s ", name(state.reactions[reaction_index].res_ms2));
     }
     printf("\n");
-}
-
-/* Check if tree is still consistent:
- *  - does not contain negative values in any node
- *  - sum of leave value equals node value for all nodes, all leaves
- */
-pcount check_tree(int no_of_leaves,	int levelSize, int offset, pcount * mwd, int spec_ind) {
-    pcount     left, right;
-
-    if (levelSize == no_of_leaves) {
-        if (mwd[offset] >= 0) {
-            return (mwd[offset]);
-        } else {
-            printf("check_tree: negative value in tree for species %s\n", name(spec_ind));
-            print_state();
-            exit(EXIT_FAILURE);
-        }
-    } else {
-		int ixInLevel = 2*offset+1;
-        left  = check_tree(no_of_leaves, 
-							levelSize*2,
-                  			ixInLevel,
-							mwd,
-							spec_ind);
-        right = check_tree(no_of_leaves,
-							levelSize*2,
-                   			ixInLevel+1, 
-							mwd,
-							spec_ind);
-        if (mwd[offset] == left + right) {
-			return (mwd[offset]);
-        } else {
-			printf("check_tree: bad tree for species %s\n", name(spec_ind));
-			printf("left = %lld right = %lld sum = %lld offset = %d",left,right,mwd[offset],offset);
-            print_state();
-            exit(EXIT_FAILURE);
-        }
-    }
 }
 
 /* React body
