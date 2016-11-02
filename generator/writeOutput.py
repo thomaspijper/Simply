@@ -204,8 +204,8 @@ class writeOutput(object):
         return True
 
 
-    def CONCENTRATION(self, file, generalDict, moleculesList):
-    # Write the starting temperature of the reaction mixture to the file
+    def MONOMERCONCENTRATION(self, file, generalDict, moleculesList):
+    # Determine the concentration of monomer and writing to the file
 
         count = 0
         monomerList = generalDict['monomernames']
@@ -215,7 +215,7 @@ class writeOutput(object):
                     count = count + moleculesList[j][2]
                     break
 
-        line = '#define CONCENTRATION {0:.8e}\n'.format(Decimal(count))
+        line = '#define MONOMERCONCENTRATION {0:.15e}\n'.format(Decimal(count))
         self.writeSingleString(file, line)
         return True
 
@@ -757,11 +757,12 @@ class writeOutput(object):
 
 
     def calcConcentration(self, moleculesList):
-    # Calculates the total concentration of reactive particles
+    # Calculates the total concentration of reactive particles (not only monomer particles)
         concentration = 0
         for i in range(len(moleculesList)):
             if moleculesList[i][0] == 'simple':
                 concentration = float(Decimal(concentration) + Decimal(moleculesList[i][2]))
+        print('\n\nThe concentration is {0}\n\n'.format(concentration))
         return concentration
 
 

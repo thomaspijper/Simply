@@ -569,6 +569,13 @@ void file_write_state(int mode) {
 	FILE *rates;
 	fileOpen(&rates, ratesfname, "a");
 
+	// Initialize writing of rate coefficients
+	char ratecoeffsfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(ratecoeffsfname, "ratecoeffs");
+	strAppend(ratecoeffsfname, ".csv");
+	FILE *ratecoeffs;
+	fileOpen(&ratecoeffs, ratecoeffsfname, "a");
+
 	if (mode == START) {
 		// Write headers for concentrations
 		fprintf(conc, "Simulation time (min);Conversion");
@@ -589,9 +596,24 @@ void file_write_state(int mode) {
 		fprintf(rates, ";Temperature (K)");
 #endif
 		for (i = 0; i < NO_OF_REACTIONS; i++) {
-			fprintf(rates, ";%s (1/s)", rname(i));
+			fprintf(rates, ";%s (mol L^-1 s^-1)", rname(i));
 		}
 		fprintf(rates, "\n");
+
+		// Write headers for rate coefficients
+		fprintf(ratecoeffs, "Simulation time (min);Conversion");
+#ifdef SIMULATEHEATING
+		fprintf(ratecoeffs, ";Temperature (K)");
+#endif
+		for (i = 0; i < NO_OF_REACTIONS; i++) {
+			if (state.reactions[i].arg_ms2 == NO_MOL) {
+				fprintf(ratecoeffs, ";%s (s^-1)", rname(i));
+			}
+			else {
+				fprintf(ratecoeffs, ";%s (L mol^-1 s^-1)", rname(i));
+			}
+		}
+		fprintf(ratecoeffs, "\n");
 
 	}
 	else if (mode == PROFILES) {
@@ -610,7 +632,7 @@ void file_write_state(int mode) {
 		fprintf(conc, ";%e", 1e6*toConc(state.momentDist[2] - 1));
 		fprintf(conc, ";%e", ((double)state.momentDist[1] / (double)state.momentDist[0]));
 		fprintf(conc, ";%e", ((double)state.momentDist[2] / (double)state.momentDist[1]));
-		fprintf(conc, ";%e", ((double)state.momentDist[2] * (double)state.momentDist[0] / ((double)state.momentDist[1] * (double)state.momentDist[1] )));
+		fprintf(conc, ";%e", ((double)state.momentDist[2] * (double)state.momentDist[0] / ((double)state.momentDist[1] * (double)state.momentDist[1])));
 #endif
 		fprintf(conc, "\n");
 
@@ -620,14 +642,28 @@ void file_write_state(int mode) {
 		fprintf(rates, ";%.2f", state.temp);
 #endif
 		for (i = 0; i < NO_OF_REACTIONS; i++) {
-			if (state.reactions[i].arg_ms2 != NO_MOL) {
-				fprintf(rates, ";%e", (state.reactions[i].rc / (double)numprocs));
-			}
-			else {
-				fprintf(rates, ";%e", state.reactions[i].rc);
-			}
+			fprintf(rates, ";%e", state.reactProbTree[i + REACT_PROB_TREE_LEAVES - 1] / AVOGADRO / state.volume);
 		}
 		fprintf(rates, "\n");
+
+		// Write rates coefficients
+		fprintf(ratecoeffs, "%f;%f", (state.time / 60.0), state.conversion);
+#ifdef SIMULATEHEATING
+		fprintf(ratecoeffs, ";%.2f", state.temp);
+#endif
+		for (i = 0; i < NO_OF_REACTIONS; i++) {
+			if (state.reactions[i].arg_ms2 == NO_MOL) { // Unimolecular reaction
+				fprintf(ratecoeffs, ";%e", state.reactions[i].rc);
+			}
+			else if (state.reactions[i].arg_ms1 == state.reactions[i].arg_ms2) { // Bimolecular reaction with identical reactants
+				fprintf(ratecoeffs, ";%e", (state.reactions[i].rc * state.volume * AVOGADRO / 2));
+			}
+			else { // Bimolecular reaction with nonidentical reactants
+					fprintf(ratecoeffs, ";%e", (state.reactions[i].rc * state.volume * AVOGADRO));
+			}
+		}
+		fprintf(ratecoeffs, "\n");
+
 	}
 	else if (mode == FULL) {
 	// Write MWD of each poly/complex species
@@ -662,6 +698,7 @@ void file_write_state(int mode) {
 	}
 	fclose(conc);
 	fclose(rates);
+	fclose(ratecoeffs);
 }
 
 /* Picks a random reaction by scanning over the rates.
@@ -893,19 +930,9 @@ void initSysState(int seed) {
 		}
     }
 
-    //state.reactions = malloc(sizeof(reaction) * NO_OF_REACTIONS);
-
-	// Adjust rate coefficients for bimolecular reactions.
-	// Needed because particles might be divided between > 1 node.
-//	for (i = 0; i < NO_OF_REACTIONS; i++) {
-//		if (state.reactions[i].arg_ms2 != NO_MOL) {
-//			state.reactions[i].rc *= ((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles);
-//		}
-//	}
-
 	state.initialMonomerMolecules = monomerCount();
 	state.currentMonomerMolecules = state.initialMonomerMolecules;
-	state.volume = (state.localMonomerParticles/AVOGADRO)/CONCENTRATION;
+	state.volume = (state.localMonomerParticles/AVOGADRO)/MONOMERCONCENTRATION;
 
 	REACTIONS_INIT
 
@@ -1338,7 +1365,7 @@ void react(void) {
 		ptime			deltatime;
 
 		rndtime = randomProb(2);
-		rate = (float)state.reactProbTree[0];
+		rate = state.reactProbTree[0];
 
 		deltatime = (-log(rndtime)) / rate;
 		state.time += deltatime;

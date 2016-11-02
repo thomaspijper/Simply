@@ -164,7 +164,7 @@ def main():
     write.molecules(outputfile,moleculesList)
     write.reactions(outputfile,reactionsList)
     write.NO_OF_REACTIONS(outputfile,reactionsList)
-    write.CONCENTRATION(outputfile,generalDict,moleculesList)
+    write.MONOMERCONCENTRATION(outputfile,generalDict,moleculesList)
     write.BASETEMP(outputfile,generalDict)
     write.STARTTEMP(outputfile,generalDict)
     write.SIMULATEHEATING(outputfile,generalDict)
