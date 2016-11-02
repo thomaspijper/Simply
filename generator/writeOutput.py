@@ -762,7 +762,6 @@ class writeOutput(object):
         for i in range(len(moleculesList)):
             if moleculesList[i][0] == 'simple':
                 concentration = float(Decimal(concentration) + Decimal(moleculesList[i][2]))
-        print('\n\nThe concentration is {0}\n\n'.format(concentration))
         return concentration
 
 
