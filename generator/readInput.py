@@ -86,7 +86,8 @@ class readInput(object):
         'calcdist':          0,          # Int, not required, default is 0 (= off)
         'freevolume':        0,          # Int, not required, default is 0 (= off)
         'recalcconversion':  0,          # Int, not required, default is 0 (= off)
-        'longchainsupport':  0           # Int, not required, default is 0 (= off)
+        'longchainsupport':  0,          # Int, not required, default is 0 (= off)
+        'usefactor2':        1           # Int, not required, default is 1 (= on)
         }
         reqLength = [2]
         reqParams = ['particlecount','monomernames','maxwalltime','syncsimtime','syncevents']
@@ -243,6 +244,11 @@ class readInput(object):
         # Check if 'longchainsupport' has a valid value
         if generalDict['longchainsupport'] not in [0,1]:
             print('\nInvalid value specified for "longchainsupport"')
+            return -1
+        
+        # Check if 'longchainsupport' has a valid value
+        if generalDict['usefactor2'] not in [0,1]:
+            print('\nInvalid value specified for "usefactor2"')
             return -1
 
         return generalDict

@@ -289,6 +289,19 @@ class writeOutput(object):
             self.writeSingleString(file, line)
         return True
 
+        
+    def SZYMANSKI(self, file, generalDict):
+    # Indicate whether the reactions with identical reactants have had their rate coeffs multiplied by 2
+
+        if generalDict['usefactor2'] == 0:
+            factor = 1
+        elif generalDict['usefactor2'] == 1:
+            factor = 2
+        
+        line = '#define SZYMANSKI {0}\n'.format(factor)
+        self.writeSingleString(file, line)
+        return True
+
 
     def freeVolumeParameters(self, file, generalDict, freeVolumeDict):
     # Write the free volume parameters
@@ -508,7 +521,7 @@ class writeOutput(object):
                     break
 
             # Compile the string that describes the rate coefficient
-            rcline = self.compileRateString(rate,particlecount,concentration,reactionsList[i],i) + '\\\n'
+            rcline = self.compileRateString(rate, particlecount, concentration, reactionsList[i], i, generalDict) + '\\\n'
 
             # Next, get the reactants and products
             r1 = read.isReactingComplex('', reactionsList[i][2], moleculesList)[1]
@@ -588,7 +601,7 @@ class writeOutput(object):
             if rate[1] in updateCases:
                 
                 # Compile the string that describes the rate coefficient, append
-                rcline = self.compileRateString(rate,particlecount,concentration,reactionsList[i],i)
+                rcline = self.compileRateString(rate, particlecount, concentration, reactionsList[i], i, generalDict)
                 if body == startFirstLine:
                     body = body + rcline
                 else:
@@ -765,7 +778,7 @@ class writeOutput(object):
         return concentration
 
 
-    def compileRateString(self, rate, particlecount, concentration, reaction, index):
+    def compileRateString(self, rate, particlecount, concentration, reaction, index, generalDict):
         
         bimolCorStr = ''
 
@@ -777,7 +790,7 @@ class writeOutput(object):
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 rc = Decimal(rate[2]) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     rc = rc * Decimal(2)
             rcline = 'state.reactions[{0}].rc = {1}{2:.8e};'.format(index, bimolCorStr, float(rc))
 
@@ -790,7 +803,7 @@ class writeOutput(object):
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     preexp = preexp * Decimal(2)
             rcline = 'state.reactions[{0}].rc = {1}{2:.8e} * exp({3:.8e} / state.temp);'.format(index, bimolCorStr, float(preexp), float(exp))
 
@@ -801,7 +814,7 @@ class writeOutput(object):
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 rc = Decimal(rate[2]) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     rc = rc * Decimal(2)
             c1t0 = rate[3]
             c1t1 = rate[4]
@@ -821,7 +834,7 @@ class writeOutput(object):
             else: # Bimolecular reaction, so we need to adjust the rate coefficient
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     preexp = preexp * Decimal(2)
             c1t0 = rate[4]
             c1t1 = rate[5]
@@ -846,7 +859,7 @@ class writeOutput(object):
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 kc = Decimal(kc) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     kc = kc * Decimal(2)
                     kd0 = kd0 * Decimal(2)
 
@@ -886,7 +899,7 @@ class writeOutput(object):
                 bimolCorStr = '((double)GLOBAL_MONOMER_PARTICLES/(double)state.localMonomerParticles) * '
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     preexp = preexp * Decimal(2)
                     kd0 = kd0 * Decimal(2)
 
@@ -928,7 +941,7 @@ class writeOutput(object):
                 kc = Decimal(kc) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
                 extRate = Decimal(extRate) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     kc = kc * Decimal(2)
                     extRate = kd0 * Decimal(2)
                     extRate = extRate * Decimal(2)
@@ -966,7 +979,7 @@ class writeOutput(object):
                 preexp = Decimal(preexp) * Decimal(concentration) / Decimal(particlecount)
                 kd0 = Decimal(kd0) * Decimal(concentration) / Decimal(particlecount)
                 extRatePreexp = Decimal(extRatePreexp) * Decimal(concentration) / Decimal(particlecount)
-                if reaction[2] == reaction[3]: # Bimolecular reaction with identical reactant, so additional multiplication by 2 needed
+                if reaction[2] == reaction[3] and generalDict['usefactor2'] == 1: # Bimolecular reaction with identical reactants, so additional multiplication by 2 may be desirable
                     preexp = preexp * Decimal(2)
                     kd0 = kd0 * Decimal(2)
                     extRatePreexp = extRatePreexp * Decimal(2)

@@ -578,7 +578,7 @@ void file_write_state(int mode) {
 
 	if (mode == START) {
 		// Write headers for concentrations
-		fprintf(conc, "Simulation time (min);Conversion");
+		fprintf(conc, "Simulation time (s);Conversion");
 #ifdef SIMULATEHEATING
 		fprintf(conc, ";Temperature (K)");
 #endif
@@ -591,7 +591,7 @@ void file_write_state(int mode) {
 		fprintf(conc, "\n");
 		
 		// Write headers for rates
-		fprintf(rates, "Simulation time (min);Conversion");
+		fprintf(rates, "Simulation time (s);Conversion");
 #ifdef SIMULATEHEATING
 		fprintf(rates, ";Temperature (K)");
 #endif
@@ -601,7 +601,7 @@ void file_write_state(int mode) {
 		fprintf(rates, "\n");
 
 		// Write headers for rate coefficients
-		fprintf(ratecoeffs, "Simulation time (min);Conversion");
+		fprintf(ratecoeffs, "Simulation time (s);Conversion");
 #ifdef SIMULATEHEATING
 		fprintf(ratecoeffs, ";Temperature (K)");
 #endif
@@ -619,7 +619,7 @@ void file_write_state(int mode) {
 	else if (mode == PROFILES) {
 
 		// Write concentrations
-		fprintf(conc, "%f;%f", (state.time / 60.0), state.conversion);
+		fprintf(conc, "%f;%f", (state.time), state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(conc, ";%.2f", state.temp);
 #endif
@@ -637,7 +637,7 @@ void file_write_state(int mode) {
 		fprintf(conc, "\n");
 
 		// Write rates
-		fprintf(rates, "%f;%f", (state.time / 60.0), state.conversion);
+		fprintf(rates, "%f;%f", (state.time), state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(rates, ";%.2f", state.temp);
 #endif
@@ -647,7 +647,7 @@ void file_write_state(int mode) {
 		fprintf(rates, "\n");
 
 		// Write rates coefficients
-		fprintf(ratecoeffs, "%f;%f", (state.time / 60.0), state.conversion);
+		fprintf(ratecoeffs, "%f;%f", (state.time), state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(ratecoeffs, ";%.2f", state.temp);
 #endif
@@ -656,7 +656,7 @@ void file_write_state(int mode) {
 				fprintf(ratecoeffs, ";%e", state.reactions[i].rc);
 			}
 			else if (state.reactions[i].arg_ms1 == state.reactions[i].arg_ms2) { // Bimolecular reaction with identical reactants
-				fprintf(ratecoeffs, ";%e", (state.reactions[i].rc * state.volume * AVOGADRO / 2));
+				fprintf(ratecoeffs, ";%e", (state.reactions[i].rc * state.volume * AVOGADRO / SZYMANSKI));
 			}
 			else { // Bimolecular reaction with nonidentical reactants
 					fprintf(ratecoeffs, ";%e", (state.reactions[i].rc * state.volume * AVOGADRO));

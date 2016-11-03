@@ -172,6 +172,7 @@ def main():
     write.RECALCCONVERSION(outputfile,generalDict)
     write.CALCMOMENTSOFDIST(outputfile,generalDict,ratesList)
     write.CALCFREEVOLUME(outputfile,generalDict)
+    write.SZYMANSKI(outputfile,generalDict)
     write.freeVolumeParameters(outputfile,generalDict,freeVolumeDict)
     write.LONGCHAINSUPPORT(outputfile,generalDict)
     write.TREE_UPDATE_BODY(outputfile,reactionsList,moleculesList)
