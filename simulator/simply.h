@@ -109,6 +109,7 @@ typedef struct {
   mwdStore      mwds[NO_OF_MOLSPECS][MAX_ARMS];
   int			arms[NO_OF_MOLSPECS];			// array of number of arms
   pcount        ms_cnts[NO_OF_MOLSPECS];
+  pcount		react_cnts[NO_OF_REACTIONS];
 
   double 		volume;
 

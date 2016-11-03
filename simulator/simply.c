@@ -911,14 +911,16 @@ void initSysState(int seed) {
 	/* free volume */
 	state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 #endif
-    /*
-     * MWDS initialise those ms_cnts not set to 0. rely on calloc for the
-     * rest
-     */
+    /* MWDS initialise those ms_cnts not set to 0. rely on calloc for the rest */
     MWD_INITS
-	
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+
+	for (i = 0; i < NO_OF_REACTIONS; i++) {
 		state.ms_cnts[i] = takeSome(state.ms_cnts[i]);
+	}
+	
+	/* Quick initialization of reaction counts*/
+	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+		state.react_cnts[i] = 0;
 	}
 
     /* initialise mwds */
@@ -1213,6 +1215,8 @@ void react(void) {
 			state.noMoreReactions = 1;
 			return;
 		}
+
+		state.react_cnts[reactionIndex] += 1;
 
 		react1_ind = state.reactions[reactionIndex].arg_ms1;
 
@@ -2696,7 +2700,7 @@ int compute() {
     - max conversion number is exceeeded 
    In addition, always stop when the maximum
    walltime has been exceeeded */
-	while (((state.time < MAX_SIM_TIME * 60)
+	while (((state.time < MAX_SIM_TIME)
 		|| (state.events < MAX_EVENTS) 
 		|| (state.conversion < MAX_CONVERSION))
 		&& (readTimerSec(&state.wallTime) < MAX_WALL_TIME * 60))
@@ -2865,7 +2869,10 @@ int main(int argc, char *argv[]) {
 
     RANK printf("Total time (us): chatting = %I64d (avg = %I64d), working = %I64d\n",total_rtime,(reduces>0?(total_rtime/reduces):0),total_wtime);
 	RANK printf("Parallel efficiency = %.1lf\n",(float)total_wtime/(float)(total_wtime+total_rtime)*100);
-    RANK printf("Events = %lld\n",state.events);
+    RANK printf("Events on node %d = %lld\n", myid, state.events);
+	RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		printf("Events for reaction %s on node %d = %lld\n", rname(i), myid, state.react_cnts[i]);
+	}
     RANK printf("Final simulation time = %lf\n",state.time);
 	RANK printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
 

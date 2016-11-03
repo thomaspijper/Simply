@@ -276,6 +276,8 @@ generator/original\ headerfiles\ (paraPolySim)/
 
 # Simulation results
 *.csv
+*.xls
+*.xlsx
 
 # Batch files
 *.bat

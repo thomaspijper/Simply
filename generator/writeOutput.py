@@ -267,17 +267,24 @@ class writeOutput(object):
 
 
     def CALCMOMENTSOFDIST(self, file, generalDict, ratesList):
-    # Indicate whether the conversion should be recalculated on each iteration
+    # Indicate whether the moments of distribution should be calculated
 
+        flag = 0
+    
+        # Check if moments of distribution are required
         for i in range(len(ratesList)):
             if ratesList[i][1] in ['fp','ap','fpr','apr']:
-                line = '#define CALCMOMENTSOFDIST\n'
-                self.writeSingleString(file, line)
+                flag = 1
                 break
-            if i == (len(ratesList) - 1):
-                if generalDict['calcdist'] != 0:
-                    line = '#define CALCMOMENTSOFDIST\n'
-                    self.writeSingleString(file, line)
+
+        # Check if the user requested the calculation
+        if flag == 0 and generalDict['calcdist'] != 0:
+            flag = 1
+        
+        # Print?
+        if flag == 1:
+            line = '#define CALCMOMENTSOFDIST\n'
+            self.writeSingleString(file, line)
         return True
 
 

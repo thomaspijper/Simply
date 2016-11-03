@@ -74,7 +74,7 @@ class readInput(object):
         'seed':              -1,         # Int, not required, no default exists
         'syncsimtime':       0,          # Int, required if 'syncevents' is not specified, default is 0 (seconds)
         'syncevents':        0,          # Int, required if 'syncsimtime' is not specified, default is 0 (events)
-        'maxsimtime':        0,          # Int, not required, default is 0 (minutes)
+        'maxsimtime':        0,          # Int, not required, default is 0 (seconds)
         'maxwalltime':       0,          # Int, not required, default is 0 (minutes)
         'maxevents':         0,          # Int, not required, default is 0 (events)
         'maxconversion':     0.0,        # Float, not required, default is 0.0 (conversion)
