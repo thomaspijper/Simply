@@ -102,12 +102,13 @@ typedef struct {
 
   float			conversion;
 
-  int			noMoreReactions; // boolean flag set to true when no more events are possible
+  int			noMoreReactionsLocal; // Boolean flag set to true when no more events are possible
+  int			noMoreReactions; // Counts number of nodes that have no events possible
 
   reaction      reactions[NO_OF_REACTIONS];
 
   mwdStore      mwds[NO_OF_MOLSPECS][MAX_ARMS];
-  int			arms[NO_OF_MOLSPECS];			// array of number of arms
+  int			arms[NO_OF_MOLSPECS];			// Array of number of arms
   pcount        ms_cnts[NO_OF_MOLSPECS];
   pcount		react_cnts[NO_OF_REACTIONS];
 

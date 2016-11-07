@@ -619,7 +619,7 @@ void file_write_state(int mode) {
 	else if (mode == PROFILES) {
 
 		// Write concentrations
-		fprintf(conc, "%f;%f", (state.time), state.conversion);
+		fprintf(conc, "%f;%f", state.time, state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(conc, ";%.2f", state.temp);
 #endif
@@ -717,10 +717,10 @@ inline int pickRndReaction() __attribute__((always_inline));
 #endif
 
 INLINE int pickRndReaction() {
-    react_prob     rate;
-    int             i;
-    react_prob          rnd, origRnd;
-	static int prevReact;
+    react_prob	rate;
+    int			i;
+    react_prob	rnd, origRnd;
+	static int	prevReact;
 
 	// Choose reaction based on probability
 	updateTree(prevReact);
@@ -744,20 +744,14 @@ INLINE int pickRndReaction() {
 	prevReact = i;
 
 	if (rate <= 0) {
-#ifdef EXPLICIT_SYSTEM_STATE
-		RANK compressState();
-#endif
-		RANK file_write_state(FULL);
-		printf("Fatal error: rate on node %d is %lf, dumping system and exiting\n\n", myid, rate);
-		printf("Simulation time is %f\n", state.time);
-		for (int j = 0; j < NO_OF_MOLSPECS; j++) {
-			printf("Particle count of %s is %f\n", name(j), 1e6*toConc(state.ms_cnts[j]));
-		}
 		if (rate < 0) {
-			dumpReactProbTree();
+			printf("Fatal error: rate on node %d is %lf. Exiting...\n\n", myid, rate);
+			exit(EXIT_FAILURE);
 		}
-		exit(EXIT_FAILURE);
+		else {
+			return -1;
 		}
+	}
 
 #if DEBUG
     if (i >= NO_OF_REACTIONS) {
@@ -891,6 +885,7 @@ void initSysState(int seed) {
 	state.nextSynchTime = state.synchTime;
 	state.events = 0;
 	state.noMoreReactions = 0;
+	state.noMoreReactionsLocal = 0;
 	state.nextSynchEvents = (int)((float)state.synchEvents/(float)numprocs);
 	state.localMonomerParticles = takeSome(GLOBAL_MONOMER_PARTICLES);
 	state.conversion = 0;
@@ -1208,12 +1203,10 @@ void react(void) {
 
 		reactionIndex = pickRndReaction();
 
-		// No events are possible, system does nothing
+		// No events are possible
 		if (reactionIndex == -1) {
-			state.time = state.nextSynchTime;
-			state.events = state.nextSynchEvents;
-			state.noMoreReactions = 1;
-			return;
+			state.noMoreReactionsLocal = 1;
+			break;
 		}
 
 		state.react_cnts[reactionIndex] += 1;
@@ -1999,7 +1992,7 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
     //                communication steps if the mwds exceed the size of the packet
 
 	(*outStatePacket)->stateTooBig = False;
-	(*outStatePacket)->noMoreReactions = state.noMoreReactions;
+	(*outStatePacket)->noMoreReactions = state.noMoreReactionsLocal;
 	(*outStatePacket)->time = state.time;
     (*outStatePacket)->deltatemp = state.deltatemp;
 	(*outStatePacket)->globalAllMonomer = monomerCount() + getConvertedMonomer();
@@ -2095,15 +2088,10 @@ int comparitorComplex(const void *m1_, const void *m2_) {
 void commToState(StatePacket **inStatePacket) {
 
 	RANK printf("commToState running...\n");
-
-	if ((*inStatePacket)->noMoreReactions == numprocs) {
-		// All nodes have no events possible
-		printf("No events possible, exiting.\n");
-		exit(EXIT_FAILURE);
-	}
 	
-    state.time = (*inStatePacket)->time/(double)numprocs;
-	state.deltatemp = (*inStatePacket)->deltatemp/(double)numprocs;
+	state.noMoreReactions = (*inStatePacket)->noMoreReactions;
+    state.time = (*inStatePacket)->time / numprocs;
+	state.deltatemp = (*inStatePacket)->deltatemp / numprocs;
 
 	pcount *speciesCounts = (pcount*)((*inStatePacket) + 1);
 	unsigned *maxChainLens = (unsigned*)(speciesCounts + NO_OF_MOLSPECS);
@@ -2291,6 +2279,7 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 		exit(EXIT_FAILURE);
 	}
 
+	inout->noMoreReactions += in->noMoreReactions;
 	inout->time += in->time;
 	inout->deltatemp += in->deltatemp;
 	inout->globalAllMonomer += in->globalAllMonomer;
@@ -2684,7 +2673,7 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 
 // ************* end command line parsing *********
 
-int compute() {
+int compute(void) {
 
 	RANK file_write_state(START);
 	RANK file_write_state(PROFILES);
@@ -2699,11 +2688,13 @@ int compute() {
     - max number of events is exceeeded
     - max conversion number is exceeeded 
    In addition, always stop when the maximum
-   walltime has been exceeeded */
+   walltime has been exceeeded or no more reactions
+   are possible on one or more nodes */
 	while (((state.time < MAX_SIM_TIME)
 		|| (state.events < MAX_EVENTS) 
 		|| (state.conversion < MAX_CONVERSION))
-		&& (readTimerSec(&state.wallTime) < MAX_WALL_TIME * 60))
+		&& (readTimerSec(&state.wallTime) < MAX_WALL_TIME * 60)
+		&& (state.noMoreReactions == 0))
 	{
 
 		Timer work;
@@ -2761,8 +2752,8 @@ int compute() {
 		// This must be redone each time since each packet is a single
 		// value whose size changes with each send.
 		MPI_Type_contiguous(stateCommSize, MPI_CHAR, &state_t); 
-		MPI_Type_commit( &state_t ); 
-		MPI_Op_create( stirr, True, &myOp ); 
+		MPI_Type_commit(&state_t); 
+		MPI_Op_create(stirr, True, &myOp);
 			
 		// perform reduction
 		reduceRes = MPI_Allreduce_wrapper(outStatePacket, inStatePacket, 1, state_t, myOp, MPI_COMM_WORLD);
@@ -2838,7 +2829,7 @@ int main(int argc, char *argv[]) {
 	startTimer(&state.wallTime);
 
 	RANK printf("\n");
-	RANK printf("Simply version 0.98 beta, released on 2016-06-06\n");
+	RANK printf("Simply version 0.99 beta prerelease\n");
 	RANK printf("Program compiled at %s on %s\n",__TIME__,__DATE__);	
 	RANK printf("\n");
 	RANK printf("Number of nodes = %d\n", numprocs);
@@ -2867,13 +2858,22 @@ int main(int argc, char *argv[]) {
 	// Run the simulation
     compute();
 
-    RANK printf("Total time (us): chatting = %I64d (avg = %I64d), working = %I64d\n",total_rtime,(reduces>0?(total_rtime/reduces):0),total_wtime);
-	RANK printf("Parallel efficiency = %.1lf\n",(float)total_wtime/(float)(total_wtime+total_rtime)*100);
+	RANK if (state.noMoreReactions != 0) {
+		printf("Exiting prematurely as %d node(s) ran out of reactions to perform\n\n", state.noMoreReactions);
+	}
+
+    RANK printf("Total time (us): chatting = %I64d (avg = %I64d), working = %I64d\n", total_rtime, (reduces>0?(total_rtime/reduces):0), total_wtime);
+	RANK printf("Parallel efficiency = %.1lf\n", (float)total_wtime/(float)(total_wtime+total_rtime)*100);
+	
+	RANK printf("\n");
     RANK printf("Events on node %d = %lld\n", myid, state.events);
 	RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
 		printf("Events for reaction %s on node %d = %lld\n", rname(i), myid, state.react_cnts[i]);
 	}
-    RANK printf("Final simulation time = %lf\n",state.time);
+	RANK printf("\n");
+
+	RANK printf("Final conversion = %f\n", state.conversion);
+	RANK printf("Final simulation time = %lf\n", state.time);
 	RANK printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
 
 #ifdef EXPLICIT_SYSTEM_STATE
@@ -2881,8 +2881,8 @@ int main(int argc, char *argv[]) {
 #endif
 
 	RANK file_write_state(FULL);
-	RANK printf("Conversion = %f\n", state.conversion);
-    MPI_Finalize();
+
+	MPI_Finalize();
 
 	exit(EXIT_SUCCESS);
 }
