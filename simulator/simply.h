@@ -28,6 +28,8 @@ typedef double probability;
 typedef double react_prob;
 typedef double ptime;
 typedef double rateCoefficient;
+typedef unsigned long long pcount; // stores a number of particles
+typedef unsigned long long rcount; // stores a number of reaction events
 #ifdef LONGCHAINSUPPORT
 typedef unsigned chainLen;
 #define CHAINLENLIMIT UINT_MAX
@@ -35,15 +37,14 @@ typedef unsigned chainLen;
 typedef short chainLen;
 #define CHAINLENLIMIT SHRT_MAX
 #endif
-typedef unsigned long long pcount; // stores a number of particles
 
 typedef struct {
-	rateCoefficient rc;
-	int arg_ms1;
-	int arg_ms2;
-	int res_ms1;
-	int res_ms2;    
-	double energy;
+	rateCoefficient	rc;
+	int				arg_ms1;
+	int				arg_ms2;
+	int				res_ms1;
+	int				res_ms2;    
+	double			energy;
 } reaction;
 
 typedef struct {
@@ -81,7 +82,7 @@ typedef struct {
 } MoleculeList;
 
 typedef struct {
-	pcount		no_of_mols;
+	pcount			no_of_mols;
 
 	ptime			time;
 	ptime			maxTime;
@@ -89,34 +90,34 @@ typedef struct {
 	ptime			synchTime;
 	Timer			wallTime;
 
-	long long		events;
-	long long		nextSynchEvents;
-	long long		synchEvents;
+	rcount			events;
+	rcount			nextSynchEvents;
+	rcount			synchEvents;
 
 #ifdef CALCMOMENTSOFDIST
-	pcount		momentDist[3];
+	pcount			momentDist[3];
 #endif
 #ifdef CALCFREEVOLUME
-	double		freeVolumeFraction;
+	double			freeVolumeFraction;
 #endif
 
 	float			conversion;
 
-	int			noMoreReactionsLocal; // Boolean flag set to true when no more events are possible
-	int			noMoreReactions; // Counts number of nodes that have no events possible
+	int				noMoreReactionsLocal; // Boolean flag set to true when no more events are possible
+	int				noMoreReactions; // Counts number of nodes that have no events possible
 
-	reaction      reactions[NO_OF_REACTIONS];
+	reaction		reactions[NO_OF_REACTIONS];
 
-	mwdStore      mwds[NO_OF_MOLSPECS][MAX_ARMS];
-	int			arms[NO_OF_MOLSPECS];			// Array of number of arms
-	pcount        ms_cnts[NO_OF_MOLSPECS];
-	pcount		react_cnts[NO_OF_REACTIONS];
+	mwdStore		mwds[NO_OF_MOLSPECS][MAX_ARMS];
+	int				arms[NO_OF_MOLSPECS]; // Array of number of arms
+	pcount			ms_cnts[NO_OF_MOLSPECS];
+	rcount			react_cnts[NO_OF_REACTIONS];
 
-	double 		volume;
+	double			volume;
 
-	double		basetemp;
-	double		deltatemp;
-	double		temp;
+	double			basetemp;
+	double			deltatemp;
+	double			temp;
 
 	pcount 			initialMonomerMolecules;
 	pcount 			currentMonomerMolecules;
@@ -140,11 +141,12 @@ typedef struct {
 
 // Stores the header of the blocks of data that are communicated.
 typedef struct {
-	int 			stateTooBig;		// Flag indicating that size of state has become too large
-	ptime			time;				// Time of system
-	double			deltatemp;			// Temperature deviation of the system
-	int 			noMoreReactions;	// Counts number of nodes that have no events possible
-	pcount 			globalAllMonomer;	// Counts number of monomer particles that have been consumed and that still exist as monomer
+	int 		stateTooBig;					// Flag indicating that size of state has become too large
+	ptime		time;							// Time of system
+	double		deltatemp;						// Temperature deviation of the system
+	int 		noMoreReactions;				// Counts the number of nodes that have no events possible
+	pcount 		globalAllMonomer;				// Counts the number of monomer particles that has been consumed + the number that still exists as monomer
+	rcount		react_cnts[NO_OF_REACTIONS];	// Counts the number of reaction events per reaction
 } StatePacket;
 
 

@@ -576,6 +576,13 @@ void file_write_state(int mode) {
 	FILE *ratecoeffs;
 	fileOpen(&ratecoeffs, ratecoeffsfname, "a");
 
+	// Initialize writing of reaction events
+	char eventsfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(eventsfname, "reactionevents");
+	strAppend(eventsfname, ".csv");
+	FILE *events;
+	fileOpen(&events, eventsfname, "a");
+
 	if (mode == START) {
 		// Write headers for concentrations
 		fprintf(conc, "Simulation time (s);Conversion");
@@ -615,9 +622,18 @@ void file_write_state(int mode) {
 		}
 		fprintf(ratecoeffs, "\n");
 
+		// Write headers for reaction events
+		fprintf(events, "Simulation time (s);Conversion");
+#ifdef SIMULATEHEATING
+		fprintf(events, ";Temperature (K)");
+#endif
+		for (i = 0; i < NO_OF_REACTIONS; i++) {
+			fprintf(events, ";%s", rname(i));
+		}
+		fprintf(events, "\n");
 	}
-	else if (mode == PROFILES) {
 
+	else if (mode == PROFILES) {
 		// Write concentrations
 		fprintf(conc, "%f;%f", state.time, state.conversion);
 #ifdef SIMULATEHEATING
@@ -637,7 +653,7 @@ void file_write_state(int mode) {
 		fprintf(conc, "\n");
 
 		// Write rates
-		fprintf(rates, "%f;%f", (state.time), state.conversion);
+		fprintf(rates, "%f;%f", state.time, state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(rates, ";%.2f", state.temp);
 #endif
@@ -647,7 +663,7 @@ void file_write_state(int mode) {
 		fprintf(rates, "\n");
 
 		// Write rates coefficients
-		fprintf(ratecoeffs, "%f;%f", (state.time), state.conversion);
+		fprintf(ratecoeffs, "%f;%f", state.time, state.conversion);
 #ifdef SIMULATEHEATING
 		fprintf(ratecoeffs, ";%.2f", state.temp);
 #endif
@@ -663,6 +679,16 @@ void file_write_state(int mode) {
 			}
 		}
 		fprintf(ratecoeffs, "\n");
+
+		// Write number of reaction events
+		fprintf(events, "%f;%f", state.time, state.conversion);
+#ifdef SIMULATEHEATING
+		fprintf(events, ";%.2f", state.temp);
+#endif
+		for (i = 0; i < NO_OF_REACTIONS; i++) {
+			fprintf(events, ";%llu", state.react_cnts[i]);
+		}
+		fprintf(events, "\n");
 
 	}
 	else if (mode == FULL) {
@@ -699,6 +725,7 @@ void file_write_state(int mode) {
 	fclose(conc);
 	fclose(rates);
 	fclose(ratecoeffs);
+	fclose(events);
 }
 
 /* Picks a random reaction by scanning over the rates.
@@ -886,7 +913,7 @@ void initSysState(int seed) {
 	state.events = 0;
 	state.noMoreReactions = 0;
 	state.noMoreReactionsLocal = 0;
-	state.nextSynchEvents = (int)((float)state.synchEvents/(float)numprocs);
+	state.nextSynchEvents = (rcount)((float)state.synchEvents/(float)numprocs);
 	state.localMonomerParticles = takeSome(GLOBAL_MONOMER_PARTICLES);
 	state.conversion = 0;
 	state.basetemp = BASETEMP;
@@ -909,12 +936,12 @@ void initSysState(int seed) {
     /* MWDS initialise those ms_cnts not set to 0. rely on calloc for the rest */
     MWD_INITS
 
-	for (i = 0; i < NO_OF_REACTIONS; i++) {
+	for (i = 0; i < NO_OF_MOLSPECS; i++) {
 		state.ms_cnts[i] = takeSome(state.ms_cnts[i]);
 	}
 	
-	/* Quick initialization of reaction counts*/
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+	/* Quick initialization of reaction counts, can probably be done in a better way */
+	for (i = 0; i < NO_OF_REACTIONS; i++) {
 		state.react_cnts[i] = 0;
 	}
 
@@ -1996,6 +2023,7 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 	(*outStatePacket)->time = state.time;
     (*outStatePacket)->deltatemp = state.deltatemp;
 	(*outStatePacket)->globalAllMonomer = monomerCount() + getConvertedMonomer();
+	memcpy((*outStatePacket)->react_cnts, state.react_cnts, sizeof(rcount) * NO_OF_REACTIONS);
 
     // Define start of array containing total number of each species, then copy particle counts
 	pcount *molCounts = (pcount*)(*outStatePacket + 1);
@@ -2092,6 +2120,16 @@ void commToState(StatePacket **inStatePacket) {
 	state.noMoreReactions = (*inStatePacket)->noMoreReactions;
     state.time = (*inStatePacket)->time / numprocs;
 	state.deltatemp = (*inStatePacket)->deltatemp / numprocs;
+
+	// Collect total of each reaction event on node 0
+	for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		if (myid == 0) {
+			state.react_cnts[i] = (*inStatePacket)->react_cnts[i];
+		}
+		else {
+			state.react_cnts[i] = 0;
+		}
+	}
 
 	pcount *speciesCounts = (pcount*)((*inStatePacket) + 1);
 	unsigned *maxChainLens = (unsigned*)(speciesCounts + NO_OF_MOLSPECS);
@@ -2283,6 +2321,9 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 	inout->time += in->time;
 	inout->deltatemp += in->deltatemp;
 	inout->globalAllMonomer += in->globalAllMonomer;
+	for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		inout->react_cnts[i] += in->react_cnts[i];
+	}
 
 	// Define layout of packet 'in'
 	pcount *specCounts_in = (pcount*)(in+1);
@@ -2634,7 +2675,7 @@ MU_TEST_SUITE(test_suite) {
 void argumentParsing(int argc, char *argv[], int *seed) {
 
 	int arg_seed = 0;
-	int arg_syncevents = 0;
+	rcount arg_syncevents = 0;
 	int arg_synctime = 0;
 	struct argparse_option options[] = {
 		OPT_HELP(),
@@ -2699,7 +2740,7 @@ int compute(void) {
 
 		Timer work;
 		startTimer(&work);
-		unsigned long long prev_events = state.events;
+		rcount prev_events = state.events;
 
 		react();
 
@@ -2748,9 +2789,9 @@ int compute(void) {
 
 		stateToComm(&outStatePacket,&inStatePacket);
 
-		// Explain to MPI how type is defined.
-		// This must be redone each time since each packet is a single
-		// value whose size changes with each send.
+		/* Explain to MPI how type is defined.
+		   This must be redone each time since each packet is a single
+		   value whose size changes with each send. */
 		MPI_Type_contiguous(stateCommSize, MPI_CHAR, &state_t); 
 		MPI_Type_commit(&state_t); 
 		MPI_Op_create(stirr, True, &myOp);
@@ -2811,7 +2852,7 @@ int compute(void) {
 		RANK file_write_state(PROFILES);
 
 		state.nextSynchTime += state.synchTime;
-		state.nextSynchEvents += (int)((float)state.synchEvents/(float)numprocs);
+		state.nextSynchEvents += (rcount)((float)state.synchEvents/(float)numprocs);
     }
    
     return 0;
@@ -2865,12 +2906,11 @@ int main(int argc, char *argv[]) {
     RANK printf("Total time (us): chatting = %I64d (avg = %I64d), working = %I64d\n", total_rtime, (reduces>0?(total_rtime/reduces):0), total_wtime);
 	RANK printf("Parallel efficiency = %.1lf\n", (float)total_wtime/(float)(total_wtime+total_rtime)*100);
 	
-	RANK printf("\n");
-    RANK printf("Events on node %d = %lld\n", myid, state.events);
-	RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
-		printf("Events for reaction %s on node %d = %lld\n", rname(i), myid, state.react_cnts[i]);
+	rcount totalEvents = 0;
+    RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		totalEvents += state.react_cnts[i];
 	}
-	RANK printf("\n");
+	RANK printf("Total number of events (on all nodes) = %lld\n", totalEvents);
 
 	RANK printf("Final conversion = %f\n", state.conversion);
 	RANK printf("Final simulation time = %lf\n", state.time);
