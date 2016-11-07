@@ -19,7 +19,7 @@
 #include "genpolymer.h"
 #include <inttypes.h>
 #if defined(__GNUC__)
-  #include <sys/time.h>
+#include <sys/time.h>
 #endif
 
 #define MAX_DATA_FILE 1000
@@ -47,15 +47,15 @@ typedef struct {
 } reaction;
 
 typedef struct {
-	float xs[MAX_DATA_FILE];
-	float ts[MAX_DATA_FILE];
-	int maxIx;
-	int ix;
+	float	xs[MAX_DATA_FILE];
+	float	ts[MAX_DATA_FILE];
+	int		maxIx;
+	int		ix;
 } TimesVals;
 
 typedef struct {
-  int     maxEntries;   /* max number of entries in leaves */
-  pcount *mwd_tree;
+	int		maxEntries;   /* max number of entries in leaves */
+	pcount	*mwd_tree;
 } mwdStore;
 
 /* Linux: use the timeval struct to store seconds and microseconds
@@ -72,84 +72,79 @@ typedef struct {
 
 /* Windows: stores values of QueryPerformanceFrequency */ 
 #if defined(_MSC_VER)
-  LARGE_INTEGER frequency;
+	LARGE_INTEGER frequency;
 #endif
 
   typedef struct {
-	chainLen *mols;
-	pcount maxMolecules;
+	chainLen	*mols;
+	pcount		maxMolecules;
 } MoleculeList;
 
 typedef struct {
-  pcount		no_of_mols;
+	pcount		no_of_mols;
 
-  ptime			time;
-  ptime			maxTime;
-  ptime			nextSynchTime;
-  ptime			synchTime;
-  Timer			wallTime;
+	ptime			time;
+	ptime			maxTime;
+	ptime			nextSynchTime;
+	ptime			synchTime;
+	Timer			wallTime;
 
-  long long events;
-  long long nextSynchEvents;
-  long long synchEvents;
+	long long		events;
+	long long		nextSynchEvents;
+	long long		synchEvents;
 
 #ifdef CALCMOMENTSOFDIST
-  pcount momentDist[3];
+	pcount		momentDist[3];
 #endif
 #ifdef CALCFREEVOLUME
-  double		freeVolumeFraction;
+	double		freeVolumeFraction;
 #endif
 
-  float			conversion;
+	float			conversion;
 
-  int			noMoreReactionsLocal; // Boolean flag set to true when no more events are possible
-  int			noMoreReactions; // Counts number of nodes that have no events possible
+	int			noMoreReactionsLocal; // Boolean flag set to true when no more events are possible
+	int			noMoreReactions; // Counts number of nodes that have no events possible
 
-  reaction      reactions[NO_OF_REACTIONS];
+	reaction      reactions[NO_OF_REACTIONS];
 
-  mwdStore      mwds[NO_OF_MOLSPECS][MAX_ARMS];
-  int			arms[NO_OF_MOLSPECS];			// Array of number of arms
-  pcount        ms_cnts[NO_OF_MOLSPECS];
-  pcount		react_cnts[NO_OF_REACTIONS];
+	mwdStore      mwds[NO_OF_MOLSPECS][MAX_ARMS];
+	int			arms[NO_OF_MOLSPECS];			// Array of number of arms
+	pcount        ms_cnts[NO_OF_MOLSPECS];
+	pcount		react_cnts[NO_OF_REACTIONS];
 
-  double 		volume;
+	double 		volume;
 
-  double		basetemp;
-  double		deltatemp;
-  double		temp;
+	double		basetemp;
+	double		deltatemp;
+	double		temp;
 
-  pcount 		initialMonomerMolecules;
-  pcount 		currentMonomerMolecules;
-  pcount		localMonomerParticles;
+	pcount 			initialMonomerMolecules;
+	pcount 			currentMonomerMolecules;
+	pcount			localMonomerParticles;
   
-  probability   *scan_scratch;
-  probability 	ratesVec[RATES_VEC_SIZE];
-  int 			ratesVecPos;
-  pcount 		tracerInitial;
+	probability		*scan_scratch;
+	probability 	ratesVec[RATES_VEC_SIZE];
+	int 			ratesVecPos;
+	pcount 			tracerInitial;
 
-  TimesVals 	timeCalcData;
-  TimesVals		sysScaleData;
-  float			scaleFactor;
+	TimesVals 		timeCalcData;
+	TimesVals		sysScaleData;
+	float			scaleFactor;
 
-  react_prob reactProbTree[2*REACT_PROB_TREE_LEAVES-1]; // was prob
+	react_prob		reactProbTree[2*REACT_PROB_TREE_LEAVES-1]; // was prob
 
-  MoleculeList *expMols;
+	MoleculeList	*expMols;
   
 } sysState;
 
 
 // Stores the header of the blocks of data that are communicated.
 typedef struct {
-	int 			stateTooBig;		// Flag indicating that size of 
-										//    state has become too large.
-	ptime           time;				// Time of system
+	int 			stateTooBig;		// Flag indicating that size of state has become too large
+	ptime			time;				// Time of system
 	double			deltatemp;			// Temperature deviation of the system
-	int 			noMoreReactions;	// Counts number of nodes that 
-										//    have no events possible.
-	pcount 			globalAllMonomer;	// Counts number of monomer 
-										//    particles that have been 
-										//    consumed and that still exist 
-										//    as monomer.
+	int 			noMoreReactions;	// Counts number of nodes that have no events possible
+	pcount 			globalAllMonomer;	// Counts number of monomer particles that have been consumed and that still exist as monomer
 } StatePacket;
 
 
