@@ -72,18 +72,23 @@ class readInput(object):
         'particlecount':     -1,         # Int, required, no default exists
         'monomernames':      'defnames', # String, required, no default exists
         'seed':              -1,         # Int, not required, no default exists
+        'calcdist':          0,          # Int, not required, default is 0 (= off)
+        
         'syncsimtime':       0,          # Int, required if 'syncevents' is not specified, default is 0 (seconds)
         'syncevents':        0,          # Int, required if 'syncsimtime' is not specified, default is 0 (events)
+        
         'maxsimtime':        0,          # Int, not required, default is 0 (seconds)
         'maxwalltime':       0,          # Int, not required, default is 0 (minutes)
         'maxevents':         0,          # Int, not required, default is 0 (events)
         'maxconversion':     0.0,        # Float, not required, default is 0.0 (conversion)
+        
         'temperature':       0.0,        # Float, not required unless Arrhenius parameters are specified or free volume based diffusion control is enabled (checks performed elsewhere) (Kelvin)
         'starttemperature':  0.0,        # Float, not required, default is 0.0 (Kelvin)
+        
         'simulateheating':   0,          # Int, not required, default is 0 (= off)
         'coolingrate':       0.0,        # Float, not required, default is 0.0 (s^-1)
         'heatcapacity':      0.0,        # Float, not required, default is 0.0 (J / (dm^3 K))
-        'calcdist':          0,          # Int, not required, default is 0 (= off)
+        
         'freevolume':        0,          # Int, not required, default is 0 (= off)
         'recalcconversion':  0,          # Int, not required, default is 0 (= off)
         'longchainsupport':  0,          # Int, not required, default is 0 (= off)
