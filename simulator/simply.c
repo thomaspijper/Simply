@@ -2776,12 +2776,8 @@ int compute(void) {
 		stateCommSize = requiredStateCommSize();
 
 		// Discard previous sync information
-		if (outStatePacket) {
-			free(outStatePacket);
-		}
-		if (inStatePacket) {
-			free(inStatePacket);
-		}
+		free(outStatePacket);
+		free(inStatePacket);
 
         // Create packet to send, and allocate memory for received packet
 		outStatePacket = (StatePacket*)malloc(stateCommSize);
