@@ -481,7 +481,7 @@ void dumpReactProbTree() {
 	int nextLev = 2;
 	
 	for (int j=0; j<2*REACT_PROB_TREE_LEAVES-1; j++) {
-		printf (" %.40lf",state.reactProbTree[j]);
+		printf (" %.40f",state.reactProbTree[j]);
 		if (j == nextLev-2) {
 			printf("\n");
 			nextLev *= 2;
@@ -772,7 +772,7 @@ INLINE int pickRndReaction() {
 
 	if (rate <= 0) {
 		if (rate < 0) {
-			printf("Fatal error: rate on node %d is %lf. Exiting...\n\n", myid, rate);
+			printf("Fatal error: rate on node %d is %f. Exiting...\n\n", myid, rate);
 			exit(EXIT_FAILURE);
 		}
 		else {
@@ -788,7 +788,7 @@ INLINE int pickRndReaction() {
 		REACTION_PROBABILITY_TREE_INIT
 		dumpReactProbTree();
 
-		printf("\n original rnd no was %.40lf\n",origRnd);
+		printf("\n original rnd no was %.40f\n",origRnd);
         exit(EXIT_FAILURE);
     }
 #endif
@@ -1483,7 +1483,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 	}
 
 	// Wall time and simulation time
-	printf("Wall time (s) = %lf\n", readTimerSec(&state.wallTime));
+	printf("Wall time (s) = %f\n", readTimerSec(&state.wallTime));
 	if (m == PRESTIRR) {
 		for (int i = 0; i < nodesToPrint; i++) {
 			printf("Simulation time (s) on node %d = %f\n", i, simtimes[i]);
@@ -2877,28 +2877,30 @@ int main(int argc, char *argv[]) {
 	// Run the simulation
     compute();
 
-	RANK if (state.noMoreReactions != 0) {
-		printf("Exiting prematurely as %d node(s) ran out of reactions to perform\n\n", state.noMoreReactions);
-	}
+	// Simulation is finished
+	RANK {
+		if (state.noMoreReactions != 0) {
+			printf("Exiting prematurely as %d node(s) ran out of reactions to perform\n\n", state.noMoreReactions);
+		}
 
-    RANK printf("Total time (us): chatting = %llu (avg = %llu), working = %llu\n", total_rtime, (reduces>0?(total_rtime/reduces):0), total_wtime);
-	RANK printf("Parallel efficiency = %.1lf\n", (float)total_wtime/(float)(total_wtime+total_rtime)*100);
-	
-	rcount totalEvents = 0;
-    RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
-		totalEvents += state.react_cnts[i];
-	}
-	RANK printf("Total number of events (on all nodes) = %llu\n", totalEvents);
+		printf("Total time (us): chatting = %llu (avg = %llu), working = %llu\n", total_rtime, (reduces > 0 ? (total_rtime / reduces) : 0), total_wtime);
+		printf("Parallel efficiency = %.1f\n", (float)total_wtime / (float)(total_wtime + total_rtime) * 100);
 
-	RANK printf("Final conversion = %f\n", state.conversion);
-	RANK printf("Final simulation time = %lf\n", state.time);
-	RANK printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
+		rcount totalEvents = 0;
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
+			totalEvents += state.react_cnts[i];
+		}
+		printf("Total number of events (on all nodes) = %llu\n", totalEvents);
+
+		printf("Final conversion = %f\n", state.conversion);
+		printf("Final simulation time = %f\n", state.time);
+		printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
 
 #ifdef EXPLICIT_SYSTEM_STATE
-	RANK compressState();
+		compressState();
 #endif
-
-	RANK file_write_state(FULL);
+		file_write_state(FULL);
+	}
 
 	MPI_Finalize();
 
