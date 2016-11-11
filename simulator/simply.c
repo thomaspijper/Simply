@@ -246,9 +246,9 @@ INLINE pcount leaveSome(pcount total) {
 
 /* Deals with overflow of array containing mwd tree
  */
-void double_arraysize (pcount **arr, int curr_size) {
+void double_arraysize(pcount **arr, int curr_size) {
   int newsize = 2 * curr_size;
-  pcount *new_arr = calloc (sizeof (pcount) * (2 * newsize - 1), 1);
+  pcount *new_arr = calloc(sizeof(pcount) * (2 * (size_t)newsize - 1), 1);
   pcount *old_arr = *arr;
 
   int p      = 1;  /* size of current level */
@@ -257,7 +257,7 @@ void double_arraysize (pcount **arr, int curr_size) {
 
   new_arr[0] = old_arr[0];
   while (p < newsize) {
-    memcpy (&(new_arr[tgt_ix]), &(old_arr[src_ix]), p * sizeof (pcount));
+    memcpy(&(new_arr[tgt_ix]), &(old_arr[src_ix]), p * sizeof(pcount));
     src_ix += p;
     p = 2*p;
     tgt_ix = 2 * p - 1;
@@ -300,9 +300,9 @@ double readTimerSec(Timer *t) {
 }
 
 void dumpTree(mwdStore *x) {
-	for (int i = 1; i <= x->maxEntries; i *= 2) {
-		for (int j = 0; j < i; j++) {
-			printf (" %lld",x->mwd_tree[i - 1 + j]);
+	for (size_t i = 1; i <= x->maxEntries; i *= 2) {
+		for (size_t j = 0; j < i; j++) {
+			printf(" %llu",x->mwd_tree[i - 1 + j]);
 		}
 		printf("\n");
 	}
@@ -358,7 +358,7 @@ void compressState(void) {
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		int arms = state.arms[i];
 		if (i >= MAXSIMPLE) {
-			printf("compressing %lld molecules of %s \n", state.ms_cnts[i], name(i));
+			printf("compressing %llu molecules of %s \n", state.ms_cnts[i], name(i));
 			// find maximum chain length to determine space required
 			chainLen maxLen = 0;
 			for (int j = 0; j < state.ms_cnts[i]; j++) {
@@ -425,7 +425,7 @@ void decompressState(void) {
 			int pos = 0;
 			chainLen offset = state.mwds[i][0].maxEntries;
 			for (chainLen len=1; len<=offset; len++) {
-				while (state.mwds[i][0].mwd_tree[offset-1+len] >=0) {
+				while (state.mwds[i][0].mwd_tree[offset-1+len] > 0) {
 					state.expMols[i].mols[pos++] = len;
 				}
 			}
@@ -440,7 +440,7 @@ INLINE void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int d
 
 	if (molecules > state.expMols[spec_ind].maxMolecules) {
 		state.expMols[spec_ind].maxMolecules *= 1.5;
-		printf("Explicit sys state expanded for species %s from %lld to %lld\n", name(spec_ind), (molecules-1), state.expMols[spec_ind].maxMolecules);
+		printf("Explicit sys state expanded for species %s from %llu to %llu\n", name(spec_ind), (molecules-1), state.expMols[spec_ind].maxMolecules);
 		chainLen *old = state.expMols[spec_ind].mols;
 		state.expMols[spec_ind].mols = malloc(state.expMols[spec_ind].maxMolecules*arms*sizeof(chainLen));
 		memcpy(state.expMols[spec_ind].mols, old, sizeof(chainLen)*(molecules-1)*arms);
@@ -714,7 +714,7 @@ void file_write_state(int mode) {
 				length = 1;
 				for (j = offset; j < 2 * offset + 1; j++) {
 					if (state.mwds[i][0].mwd_tree[j] > 0) {
-						fprintf(dist, "%d;%lld;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
+						fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
 					}
 					length++;
 				}
@@ -968,10 +968,10 @@ void initSysState(int seed) {
 	
 #ifdef EXPLICIT_SYSTEM_STATE
 	state.expMols = malloc(sizeof(MoleculeList)*NO_OF_MOLSPECS);
-	for (int i=0; i<NO_OF_MOLSPECS; i++) {
-		int initialSize = 10485760;
+	for (int i=0; i < NO_OF_MOLSPECS; i++) {
+		size_t initialSize = 10485760;
 		if (i >= MAXSIMPLE) {
-			state.expMols[i].mols = malloc(initialSize*sizeof(chainLen)*state.arms[i]);
+			state.expMols[i].mols = malloc(initialSize * sizeof(chainLen) * (size_t)state.arms[i]);
 			state.expMols[i].maxMolecules = initialSize;
 		}
 	}
@@ -1102,7 +1102,7 @@ int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 		pcount lastIx = state.ms_cnts[spec_index]-1;
 		pcount rndIx = (pcount)((double)randomProb(3)*(double)lastIx + 0.5); // Fast rounding by adding 0.5, then casting to int
 		chainLen *pickedPos = &state.expMols[spec_index].mols[rndIx*(*arms)];
-		int memSize = (*arms)*sizeof(chainLen);
+		size_t memSize = (*arms)*sizeof(chainLen);
 		memcpy(lens, pickedPos, memSize);
 
 		if (rndIx != lastIx) {
@@ -1395,10 +1395,8 @@ void react(void) {
 		state.time += deltatime;
 
 #ifdef COOLINGRATE
-		if (state.deltatemp != 0.0) { // Don't cool when not possible
-			state.deltatemp *= exp(-1 * COOLINGRATE * deltatime);
-			state.temp = state.basetemp + state.deltatemp;
-		}
+		state.deltatemp *= exp(-1 * COOLINGRATE * deltatime);
+		state.temp = state.basetemp + state.deltatemp;
 #endif
 
 #ifdef CALCFREEVOLUME
@@ -1418,7 +1416,6 @@ void react(void) {
 		  ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
 
     RANK printf("done!\n");
-
 }
 
 // Prints the mwds and molecule counts
@@ -1427,9 +1424,9 @@ void react(void) {
 	printf("\n\n");
     for (i = 0; i < NO_OF_MOLSPECS; i++) {
         if (state.ms_cnts[i] > 0) {
-            printf("Species %s (%lld): ", name(i), state.ms_cnts[i]);
+            printf("Species %s (%llu): ", name(i), state.ms_cnts[i]);
             if (i < MAXSIMPLE) {
-                printf("%lld\n", state.ms_cnts[i]);
+                printf("%llu\n", state.ms_cnts[i]);
             } else {
 				pcount cnts[MAX_ARMS];
 				offset = state.mwds[i][0].maxEntries;
@@ -1442,7 +1439,7 @@ void react(void) {
 					if (total > 0) {
 						printf("%d",j+1);
 						for (int a=0; a<state.arms[i]; a++) {
-							printf("\t%lld", cnts[a]);
+							printf("\t%llu", cnts[a]);
 						}
 						printf("\n");
 					}
@@ -1472,7 +1469,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 	}
 
 	printf("\n");
-	for (int i = 0; i < sum; i++) {
+	for (size_t i = 0; i < sum; i++) {
 		printf("-");
 	}
 	printf("\n");
@@ -1525,7 +1522,8 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 		printf(" ");
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		printf("%s", name(i));
-		for (int j = 0; j < (nameLens[i] - strlen(name(i))); j++) {
+		size_t len_name = strlen(name(i));
+		for (int j = 0; j < (nameLens[i] - len_name); j++) {
 			printf(" ");
 		}
 	}
@@ -1546,7 +1544,8 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 			char tmp[MAX_FILENAME_LEN];
 			snprintf(tmp, MAX_FILENAME_LEN, "%.4E", 1e6*toConc(statecnts[j + i * NO_OF_MOLSPECS]));
 			printf("%s", tmp);
-			for (int k = 0; k < (nameLens[j] - strlen(tmp)); k++)
+			size_t len_tmp = strlen(tmp);
+			for (int k = 0; k < (nameLens[j] - len_tmp); k++)
 				printf(" ");
 		}
 		printf("\n");
@@ -1554,10 +1553,10 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 #ifdef CALCMOMENTSOFDIST
 	printf("\n");
-	for (int i = 0; i < nodeIDLen; i++)
+	for (size_t i = 0; i < nodeIDLen; i++)
 		printf(" ");
 	printf("0th moment 1st moment 2nd moment\n");
-	for (int i = 0; i < nodeIDLen; i++)
+	for (size_t i = 0; i < nodeIDLen; i++)
 		printf(" ");
 	printf("of distrib of distrib of distrib NACL       WACL       PDI        \n");
 
@@ -1582,7 +1581,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 	}
 #endif
 
-	for (int j = 0; j<sum; j++)
+	for (size_t j = 0; j < sum; j++)
 		printf("-");
 	printf("\n");
 	printf("\n");
@@ -1595,30 +1594,30 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 	// Collect simulation times
 	ptime *workerStateTime = NULL;
-	RANK workerStateTime = malloc(sizeof(ptime) * numprocs);
+	RANK workerStateTime = malloc(sizeof(ptime) * (size_t)numprocs);
 	MPI_Gather(&state.time, 1, MPI_DOUBLE, workerStateTime, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	// Collect conversions
 	float *workerStateConversion = NULL;
-	RANK workerStateConversion = malloc(sizeof(float) * numprocs);
+	RANK workerStateConversion = malloc(sizeof(float) * (size_t)numprocs);
 	MPI_Gather(&state.conversion, 1, MPI_FLOAT, workerStateConversion, 1, MPI_FLOAT, 0, MPI_COMM_WORLD);
 
 	// Collect simulation temperatures
 	double *workerStateTemp = NULL;
 #ifdef SIMULATEHEATING
-	RANK workerStateTemp = malloc(sizeof(double) * numprocs);
+	RANK workerStateTemp = malloc(sizeof(double) * (size_t)numprocs);
 	MPI_Gather(&state.temp, 1, MPI_DOUBLE, workerStateTemp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
 
 	// Collect species counts
 	pcount *workerStateCnts = NULL;
-	RANK workerStateCnts = malloc(sizeof(pcount) * numprocs * NO_OF_MOLSPECS);
+	RANK workerStateCnts = malloc(sizeof(pcount) * (size_t)numprocs * NO_OF_MOLSPECS);
 	MPI_Gather(&state.ms_cnts, NO_OF_MOLSPECS, MPI_UNSIGNED_LONG_LONG, workerStateCnts, NO_OF_MOLSPECS, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
 
 	// Collect moments of distribution
 	pcount *workerStateMomentDist = NULL;
 #ifdef CALCMOMENTSOFDIST
-	RANK workerStateMomentDist = malloc(sizeof(pcount) * numprocs * distNo);
+	RANK workerStateMomentDist = malloc(sizeof(pcount) * (size_t)numprocs * distNo);
 	MPI_Gather(&state.momentDist, distNo, MPI_UNSIGNED_LONG_LONG, workerStateMomentDist, distNo, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
 #endif
 
@@ -1641,9 +1640,9 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 	size_t maxNameLen = 10; // 9 characters and 1 space
 	size_t nodeIDLen = strlen("Node XYZ ");
 	size_t sum = 0;
-	int nodesToPrint = 1;
-	int rankLen = 1;
-	int armStrLen = 1;
+	size_t nodesToPrint = 1;
+	size_t rankLen = 1;
+	size_t armStrLen = 1;
 
 	IFVERBOSENODES nodesToPrint = numprocs;
 
@@ -1651,7 +1650,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 	sum += nodeIDLen * nodesToPrint;
 
 	printf("\n");
-	for (int i = 0; i < sum; i++) {
+	for (size_t i = 0; i < sum; i++) {
 		printf("-");
 	}
 	printf("\n");
@@ -1680,7 +1679,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 	}
 	printf("\n");
 
-	int pntrPos = 0;
+	size_t pntrPos = 0;
 	for (int i = 0; i < MAXPOLY; i++) {
 		if (i >= MAXSIMPLE) {
 			//Print name
@@ -1690,7 +1689,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 				printf(" ");
 			}
 			//Print for each node
-			for (int j = 0; j < nodesToPrint; j++) {
+			for (size_t j = 0; j < nodesToPrint; j++) {
 				// Compare arms lengths for multiarm species
 				unsigned armLen = 0;
 				for (int k = 0; k < state.arms[i]; k++) {
@@ -1705,7 +1704,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 				else {
 					armStrLen = (int)log10(armLen) + 1;
 				}
-				for (int k = 0; k < (nodeIDLen - armStrLen); k++) {
+				for (size_t k = 0; k < (nodeIDLen - armStrLen); k++) {
 					printf(" ");
 				}
 				pntrPos -= 1; // We've gone 1 too far
@@ -1714,7 +1713,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 		}
 		pntrPos += 1;
 	}
-	for (int i = 0; i < sum; i++) {
+	for (size_t i = 0; i < sum; i++) {
 		printf("-");
 	}
 	printf("\n");
@@ -1773,19 +1772,19 @@ size_t communicateMaxChainLens(int mode, unsigned *maxChainLens) {
 void print_state_conc(void) {
 	int i, j, offset, length;
 
-	printf ("System state:\n\ttime: %f node volume = %E L\n",state.time,state.volume);
+	printf ("System state:\n\ttime: %f node volume = %E L\n", state.time, state.volume);
 
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
 		if (state.ms_cnts[i] > 0) {
-			printf (" %s %lld = (%.0f umol/L):\n", name(i), state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
+			printf (" %s %llu = (%.0f umol/L):\n", name(i), state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
 			if (i < MAXSIMPLE) {
-				printf ("\t %lld = %.0f umol/L\n", state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
+				printf ("\t %llu = %.0f umol/L\n", state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
 			} else {
 				offset = state.mwds[i][0].maxEntries - 1;
 				length = 1;
 				for (j = offset; j < 2*offset+1; j++) {
 					if (state.mwds[i][0].mwd_tree[j] > 0) {
-						printf ("%d\t%lld = %.0f umol/L \n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
+						printf ("%d\t%llu = %.0f umol/L \n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
 					}
 					length++;
 				}
@@ -1866,7 +1865,7 @@ void monomerAudit(const char *str) {
 		int auditFailFlag = 0;
 		for (int i = 0; i < numprocs; i++) {
 			if (workerDiscrepancies[i] != 0) {
-				printf("Local monomer audit (%s) failed on node %d! Discrepancy = %lld\n", str, i, workerDiscrepancies[i]);
+				printf("Local monomer audit (%s) failed on node %d! Discrepancy = %llu\n", str, i, workerDiscrepancies[i]);
 				auditFailFlag = 1;
 			}
 		}
@@ -2071,9 +2070,9 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 				memcpy(packetMwds, compMols, bytes);
 				// maxChainLens[pos] = state.ms_cnts[i]; // redundant line, this is already done in getMaxChainLen()
 				IFVERBOSE {
-					printf("Before stirr: %lld molecules of %s in packet: ", state.ms_cnts[i], name(i));
+					printf("Before stirr: %llu molecules of %s in packet: ", state.ms_cnts[i], name(i));
 					for (int t = 0; t < state.ms_cnts[i]*state.arms[i]; t++) {
-						IFVERBOSELONG printf(" %d\n", *((chainLen*)packetMwds+t));
+						IFVERBOSELONG printf(" %u\n", *((chainLen*)packetMwds+t));
 					}
 					printf("\n");
 				}
@@ -2153,7 +2152,7 @@ void commToState(StatePacket **inStatePacket) {
 		if (state.arms[i] == 1) { // poly species
 
 			unsigned maxChainLen = maxChainLens[pos];
-			RANK IFVERBOSE printf("maxChainLen[%s] = %u\n",name(i),maxChainLen);
+			RANK IFVERBOSE printf("maxChainLen[%s] = %u\n", name(i), maxChainLen);
 
 			int takeInterval = numprocs;
 			int takeCounter = myid; // myid functions as offset
@@ -2164,7 +2163,7 @@ void commToState(StatePacket **inStatePacket) {
 				chainLen length = j+1;
 				while (mols > 0) {
 					if (molsAddedSoFar >= state.expMols[i].maxMolecules) {
-						IFVERBOSE printf("masf = %lld mm = %lld\n",molsAddedSoFar,state.expMols[i].maxMolecules);
+						IFVERBOSE printf("masf = %llu mm = %llu\n", molsAddedSoFar, state.expMols[i].maxMolecules);
 						printf("system state expanded for %s in commToState\n", name(i));
 						state.expMols[i].maxMolecules *= 1.5;
 						chainLen *old = state.expMols[i].mols;
@@ -2188,11 +2187,11 @@ void commToState(StatePacket **inStatePacket) {
 		else { // complex species
 			pcount start = leaveSome(maxChainLens[pos]);
 			pcount molecules = takeSome(maxChainLens[pos]);
-			IFVERBOSE printf("After stirr: %lld molecules of %s\n", molecules, name(i));
+			IFVERBOSE printf("After stirr: %llu molecules of %s\n", molecules, name(i));
 
 			pcount end = start + molecules;
-			IFVERBOSE printf("start = %lld end = %lld\n", start, end);
-			IFVERBOSE printf("maxChainLens[pos] = %d\n", maxChainLens[pos]);
+			IFVERBOSE printf("start = %llu end = %llu\n", start, end);
+			IFVERBOSE printf("maxChainLens[pos] = %u\n", maxChainLens[pos]);
 			chainLen *list = (chainLen*)mwd;
 
 			// The complex species must be sorted! This is because different processes
@@ -2210,17 +2209,17 @@ void commToState(StatePacket **inStatePacket) {
 			
 			IFVERBOSE {
 				printf("lengths of %s in packet: ",name(i));
-				for (int t = 0; t < maxChainLens[pos]*state.arms[i]; t++) {
+				for (int t = 0; t < maxChainLens[pos] * state.arms[i]; t++) {
 					IFVERBOSELONG printf(" %d\n", list[t]);
 				}
 				printf("\n");
 			}
 			
-			mwd = (pcount*)((char*)mwd + sizeof(chainLen)*maxChainLens[pos]*state.arms[i]);
+			mwd = (pcount*)((char*)mwd + sizeof(chainLen) * maxChainLens[pos] * state.arms[i]);
 
 			pos += state.arms[i];
 			IFVERBOSE {
-				printf("After stirr2: %lld molecules of %s: ", state.ms_cnts[i],name(i));
+				printf("After stirr2: %llu molecules of %s: ", state.ms_cnts[i], name(i));
 				for (int t=0; t < state.ms_cnts[i]*state.arms[i]; t++) {
 					IFVERBOSELONG printf(" %d\n",state.expMols[i].mols[t]);
 				}
@@ -2283,7 +2282,7 @@ void commToState(StatePacket **inStatePacket) {
 	// Global monomer audit
 	RANK { 
 		if ((*inStatePacket)->globalAllMonomer != GLOBAL_MONOMER_PARTICLES) {
-			printf("Global monomer audit has failed! Discrepancy = %lld\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
+			printf("Global monomer audit has failed! Discrepancy = %llu\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
 		}
 		else {
 			printf("Global monomer audit passed.\n");
@@ -2299,7 +2298,7 @@ void commToState(StatePacket **inStatePacket) {
 void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
 	for (unsigned i = 0; i < totalLength; i++) {
 		if (mwd[i] > state.localMonomerParticles)
-			printf("******************* %s: Bad data after stirring totalLen = %d\n", str, totalLength);
+			printf("******************* %s: Bad data after stirring totalLen = %u\n", str, totalLength);
 	}
 }
 
@@ -2634,22 +2633,6 @@ MU_TEST(double_arraysize_test) {
 	mu_assert_int_eq(expectedValue, arr[i]); // Last value in array
 }
 
-/*  Test the double_arraysize() function by summing the elements of two dummy arrays */
-MU_TEST(dvecAdd_test) {
-	// Initialize dummy arrays.
-	pcount array1[3] = { 0, 1, 2 };
-	pcount array2[3] = { 9223372036854775808, 9223372036854775808, 9223372036854775808 };
-	pcount array12[3];
-
-	// Perform function
-	dvecAdd(array12, array1, array2, 3);
-
-	// Test whether dvecAdd() worked as intended (it should be able to handle ULL sized values)
-	for (int i = 0; i < 3; i++) {
-		mu_assert_int_eq(9223372036854775808 + i, array12[i]);
-	}
-}
-
 /* Tests to run */
 MU_TEST_SUITE(test_suite) {
 
@@ -2660,7 +2643,6 @@ MU_TEST_SUITE(test_suite) {
 	RANK MU_RUN_TEST(START_MWD_SIZE_test);
 	RANK MU_RUN_TEST(minmax_test);
 	RANK MU_RUN_TEST(double_arraysize_test);
-	RANK MU_RUN_TEST(dvecAdd_test);
 
 	if (numprocs > 1) {
 		MU_RUN_TEST(takeSome_test);
@@ -2676,7 +2658,7 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 
 	int arg_seed = 0;
 	rcount arg_syncevents = 0;
-	int arg_synctime = 0;
+	unsigned long long arg_synctime = 0;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
@@ -2698,17 +2680,17 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	}
 	if (arg_syncevents != 0) {
 		state.synchEvents = arg_syncevents;
-		RANK printf("Overriding compiled number of events synchronization interval with user specified number: %lld\n", state.synchEvents);
+		RANK printf("Overriding compiled number of events synchronization interval with user specified number: %llu\n", state.synchEvents);
 	}
 	else {
-		RANK printf("Number of events between each two synchronizations: %lld\n", state.synchEvents);
+		RANK printf("Number of events between each two synchronizations: %llu\n", state.synchEvents);
 	}
 	if (arg_synctime != 0) {
 		state.synchTime = arg_synctime;
-		RANK printf("Overriding compiled simulation time synchronization interval with user specified time: %f\n", state.synchTime);
+		RANK printf("Overriding compiled simulation time synchronization interval with user specified time: %llu\n", state.synchTime);
 	}
 	else {
-		RANK printf("Simulation time between each two synchronizations: %f\n", state.synchTime);
+		RANK printf("Simulation time between each two synchronizations: %llu\n", state.synchTime);
 	}
 }
 
@@ -2744,9 +2726,9 @@ int compute(void) {
 
 		react();
 
-		int64_t wtime = readTimer(&work);
+		unsigned long long wtime = readTimer(&work);
 		total_wtime += wtime;
-		RANK printf("Total calculation walltime (us) = %I64d\n", total_wtime);
+		RANK printf("Total calculation walltime (us) = %llu\n", total_wtime);
 		state.currentMonomerMolecules = monomerCount();
 		state.conversion = conversion();
 
@@ -2754,8 +2736,8 @@ int compute(void) {
 		monomerAudit("post reactions");
 #endif
 
-		RANK printf("Work time (us) on node %d = %I64d\n", myid, wtime);
-		RANK printf("Total number of events on node %d = %lld\n", myid, state.events);
+		RANK printf("Work time (us) on node %d = %llu\n", myid, wtime);
+		RANK printf("Total number of events on node %d = %llu\n", myid, state.events);
 		RANK printf("Computational speed on node %d = %.4f events/us\n", myid, (float)(state.events-prev_events)/(float)wtime);
 		
 		state_summary(PRESTIRR);
@@ -2807,7 +2789,7 @@ int compute(void) {
 	
 #ifdef CHANGE_SEED
 		// generate new seed
-		int nextSeed = wtime+lastReduceTime+fetchpid();
+		int nextSeed = lastReduceTime+fetchpid();
 		dsfmt_gv_init_gen_rand(nextSeed);
 //		printf("new random seed is %d\n",nextSeed);
 #endif
@@ -2827,13 +2809,13 @@ int compute(void) {
 
 			if (i >= MAXSIMPLE) {
 				state.momentDist[0] += state.ms_cnts[i];
-				int arms = state.arms[i];
+				size_t arms = state.arms[i];
 
 				for (int j = 0; j < state.ms_cnts[i]; j++) {
 					chainLen *lengths = &state.expMols[i].mols[arms*j];
 					chainLen totalLen = 0;
 
-					for (int a = 0; a < arms; a++) {
+					for (size_t a = 0; a < arms; a++) {
 						totalLen += lengths[a];
 					}
 					state.momentDist[1] += totalLen;
@@ -2899,14 +2881,14 @@ int main(int argc, char *argv[]) {
 		printf("Exiting prematurely as %d node(s) ran out of reactions to perform\n\n", state.noMoreReactions);
 	}
 
-    RANK printf("Total time (us): chatting = %I64d (avg = %I64d), working = %I64d\n", total_rtime, (reduces>0?(total_rtime/reduces):0), total_wtime);
+    RANK printf("Total time (us): chatting = %llu (avg = %llu), working = %llu\n", total_rtime, (reduces>0?(total_rtime/reduces):0), total_wtime);
 	RANK printf("Parallel efficiency = %.1lf\n", (float)total_wtime/(float)(total_wtime+total_rtime)*100);
 	
 	rcount totalEvents = 0;
     RANK for (int i = 0; i < NO_OF_REACTIONS; i++) {
 		totalEvents += state.react_cnts[i];
 	}
-	RANK printf("Total number of events (on all nodes) = %lld\n", totalEvents);
+	RANK printf("Total number of events (on all nodes) = %llu\n", totalEvents);
 
 	RANK printf("Final conversion = %f\n", state.conversion);
 	RANK printf("Final simulation time = %lf\n", state.time);
