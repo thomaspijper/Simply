@@ -66,56 +66,57 @@
   //#include <windows.h>
 #endif
 
-// Our own headers
+  // Our own headers
 #include "dSFMT.h"
 #include "argparse.h"
 #include "minunit.h"
 #include "genpolymer.h"
 #include "simply.h"
 
-// Debugging functions
-//#define DEBUG 1
-//#define TRACE 1
-//#define NO_COMM 1
-#define MONO_AUDIT
 #define EXPLICIT_SYSTEM_STATE
 
-// Control of random number generation
-//#define CHANGE_SEED 1
-
-//#define SCALING 1
-
-#define VERBOSE 1
-#define IFVERBOSE if (VERBOSE == 1)
-#define IFVERBOSELONG if (VERBOSE == 2)
 #define RANK if (myid == 0)
-#define VERBOSENODES 1
-#define IFVERBOSENODES if (VERBOSENODES == 1)
 
-// Aliases used for printing to files
+  // Control of random number generation
+  //#define CHANGE_SEED 1
+
+  //#define SCALING 1
+
+  // Verbose options
+#define VERBOSE 1
+#define IFVERBOSE if (VERBOSE >= 1)
+#define IFVERBOSELONG if (VERBOSE >= 2)
+#define VERBOSENODES 1
+#define IFVERBOSENODES if (VERBOSENODES >= 1)
+
+  // Debugging functions
+#define DEBUGLEVEL 1
+  //#define TRACE 1
+  //#define NO_COMM 1
+#define MONO_AUDIT
+
+  // Aliases used for printing state infor to files
 #define FULL 0
 #define PROFILES 1
 #define START 2
 
-// Aliases used for printing to screen
+  // Aliases used for printing state info to screen
 #define PRESTIRR 0
 #define POSTSTIRR 1
 
-#define HOST_ID 0
 #define START_MWD_SIZE 512 // must be a power of 2
 #define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
-#define TREE_SAMPLE	10
 #define MAX_FILENAME_LEN 100
 #define MAX_FILE_SIZE 1048576
 
 #define AVOGADRO 6.022140857E23
 
-/* Number of PRNs to generate at a time.
-   Should not be smaller than 382 and must be an even number.
-   Changing this value will lead to different PRNs being generated. */
+  /* Number of PRNs to generate at a time.
+  Should not be smaller than 382 and must be an even number.
+  Changing this value will lead to different PRNs being generated. */
 #define PRNG_ARRAY_SIZE 1000
 
-// Messages for setting up data at start
+  // Messages for setting up data at start
 #define SETUP_END 0
 #define SETUP_CONVDATA 1
 #define SETUP_SYSTEMSCALES 2
@@ -266,6 +267,9 @@ void double_arraysize(pcount **arr, int curr_size) {
   free (old_arr);
 }
 
+// ************* begin timer code ********
+
+/* Start a timer */
 void startTimer(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->start_t,NULL);
@@ -274,7 +278,8 @@ void startTimer(Timer *t) {
 #endif
 }
 
-uint64_t readTimer(Timer *t) {
+/* Read a timer, return microseconds */
+unsigned long long readTimer(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->end_t,NULL);
 	return (1000000 * t->end_t.tv_sec + t->end_t.tv_usec) - (1000000 * t->start_t.tv_sec + t->start_t.tv_usec);
@@ -285,6 +290,7 @@ uint64_t readTimer(Timer *t) {
 #endif
 }
 
+/* Read a timer, return seconds */
 double readTimerSec(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->end_t,NULL);
@@ -298,6 +304,23 @@ double readTimerSec(Timer *t) {
 	return ((double)elapsedTicks / (double)frequency.QuadPart);
 #endif
 }
+
+/* Get the current time (currently used for debugging only) */
+#if DEBUGLEVEL >= 1
+  #if defined(__GNUC__) // --------------------------------------------------------------- To be implemented (high priority) ------
+    #error Debugging not yet implemented for UNIX systems. Please set DEBGUGLEVEL as 0.
+  #elif defined(_MSC_VER)
+SYSTEMTIME getSystemTime(void) {
+	FILETIME fileTime;
+	SYSTEMTIME userSystemTime;
+	GetSystemTimeAsFileTime(&fileTime);
+	FileTimeToSystemTime(&fileTime, &userSystemTime);
+	return userSystemTime;
+}
+  #endif
+#endif
+
+// ************* end timer code ********
 
 void dumpTree(mwdStore *x) {
 	for (size_t i = 1; i <= x->maxEntries; i *= 2) {
@@ -728,6 +751,32 @@ void file_write_state(int mode) {
 	fclose(events);
 }
 
+void file_write_debug(const char *str) {
+
+	// Initialize writing of logfile
+	char logfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(logfname, "logfile");
+	strAppend(logfname, ".txt");
+	FILE *log;
+	fileOpen(&log, logfname, "a");
+
+	// Write log info
+	char timeStamp[MAX_FILENAME_LEN] = "\0";
+	SYSTEMTIME systemTime = getSystemTime();
+	fprintf(log, "[%04d-%02d-%02d %02d:%02d:%02d:%03d] ", systemTime.wYear, systemTime.wMonth, systemTime.wDay, 
+			                                              systemTime.wHour, systemTime.wMinute, systemTime.wSecond, 
+			                                              systemTime.wMilliseconds);
+	fprintf(log, "%s\n", str);
+	fflush(log);
+#if defined(__GNUC__)
+	fsync(log);
+#elif defined(_MSC_VER)
+	FlushFileBuffers(log);
+#endif
+	// Close log file
+	fclose(log);
+}
+
 /* Picks a random reaction by scanning over the rates.
 *
 * Since the old scan results are still present, it is
@@ -780,7 +829,7 @@ INLINE int pickRndReaction() {
 		}
 	}
 
-#if DEBUG
+#if DEBUGLEVEL >= 2
     if (i >= NO_OF_REACTIONS) {
         printf("pickRndReaction: ran out of reactions, i = %d no reactions = %d\n",i,NO_OF_REACTIONS);
 
@@ -895,6 +944,10 @@ void setupParallelData() {
  * From CodeGen polysim.c.
  */
 void initSysState(int seed) {
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Start initialization of the simulation");
+#endif
+
     int i;
 
 	dsfmt_gv_init_gen_rand(seed);
@@ -976,7 +1029,9 @@ void initSysState(int seed) {
 		}
 	}
 #endif
-
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Initialization of the simulation complete");
+#endif
 }
 
 //#if defined(_MSC_VER)
@@ -1003,7 +1058,7 @@ INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
 			curr++;
 			prob -= curr_prob;
 		}
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 		if (mwd_tree[curr - 1] < 0) {
 			return (-1);
 		}
@@ -1023,8 +1078,8 @@ INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
  */
 int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
-#if defined(DEBUG)
-    //assert(state.ms_cnts[spec_index] > 0);
+#if DEBUGLEVEL >= 2
+    assert(state.ms_cnts[spec_index] > 0);
 	if (state.ms_cnts[spec_index] <= 0) {
 		printf("Trying to pick %s when there are none\n",name(spec_index));
 		print_state();
@@ -1048,7 +1103,7 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 		pcount *mwd_tree = state.mwds[spec_index][0].mwd_tree;
 		int size         = state.mwds[spec_index][0].maxEntries;
 		lens[0] = pickRndChainLen(mwd_tree,size);
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 		if (lens[0] < 0) {
 			printf("error: chain length < 0 for species %s(arm=0)\n", name(spec_index));
 			print_state();
@@ -1066,7 +1121,7 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 			pcount *mwd_tree = state.mwds[spec_index][a].mwd_tree;
 			int size         = state.mwds[spec_index][a].maxEntries;
 			lens[a] = pickRndChainLen(mwd_tree,size);
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 			if (lens[a] < 0) {
 				printf("error: chain length < 0 for species %s(arm=%d)\n", name(spec_index), a);
 				print_state();
@@ -1082,8 +1137,8 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
 int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 
-#if defined(DEBUG)
-    //assert(state.ms_cnts[spec_index] > 0);
+#if DEBUGLEVEL >= 2
+    assert(state.ms_cnts[spec_index] > 0);
 	if (state.ms_cnts[spec_index] <= 0) {
 		printf("Trying to pick %s when there are none\n",name(spec_index));
 		print_state();
@@ -1200,6 +1255,9 @@ void print_reaction(int reaction_index) {
 /* React body
  */
 void react(void) {
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("  Start react() function; performing reactions until next sycnchronization point is reached");
+#endif
 
 	int             reactionIndex;
 
@@ -1256,7 +1314,7 @@ void react(void) {
 
 		}
 
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 		if (prm1 != 0 || prm2 != 0) {
 			printf("Problem reaction %d\n", reactionIndex);
 			abort();
@@ -1271,7 +1329,7 @@ void react(void) {
 		switch (reactionIndex)
 			DO_REACT_BODY
 
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 		assert(prod1_ind != -1);
 #endif
 
@@ -1283,7 +1341,7 @@ void react(void) {
 			adjustMolCnt(prod1_ind, prod1_lens, prod1_arms, 1);
 #endif
 
-#ifdef DEBUG
+#if DEBUGLEVEL >= 2
 			assert(prod1_arms == state.arms[prod1_ind]);
 #endif
 		}
@@ -1403,8 +1461,7 @@ void react(void) {
 		state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 #endif
 
-#if defined(DEBUG)
-		//	monomerAudit(MONOMER_INDEX);
+#if DEBUGLEVEL >= 2
 		assert(rate >= 0);
 #endif
 
@@ -1416,6 +1473,9 @@ void react(void) {
 		  ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
 
     RANK printf("done!\n");
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("  React() has finished");
+#endif
 }
 
 // Prints the mwds and molecule counts
@@ -2004,6 +2064,9 @@ size_t requiredStateCommSize(void) {
 }
 
 void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    Starting stateToComm() function");
+#endif
 
 	// Packet format
 	// [ Header                                    | Body                                 ]
@@ -2093,6 +2156,9 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 #endif
 		}
 	}
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    stateToComm() has finished");
+#endif
 }
 
 int comparitorComplex(const void *m1_, const void *m2_) {
@@ -2113,7 +2179,9 @@ int comparitorComplex(const void *m1_, const void *m2_) {
  * polymeric species.
  */
 void commToState(StatePacket **inStatePacket) {
-
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    Starting commToState() function");
+#endif
 	RANK printf("commToState running...\n");
 	
 	state.noMoreReactions = (*inStatePacket)->noMoreReactions;
@@ -2247,7 +2315,7 @@ void commToState(StatePacket **inStatePacket) {
 			pcount *leaves = state.mwds[i][a].mwd_tree + entries - 1;
 
 			unsigned maxChainLen = maxChainLens[pos];
-			assert (maxChainLen <= entries);
+			assert(maxChainLen <= entries);
 
 			pcount ms_cnts_tmp = 0;
 			for (unsigned j = 0; j < maxChainLen; j++) {
@@ -2293,6 +2361,9 @@ void commToState(StatePacket **inStatePacket) {
 	state.initialMonomerMolecules = state.currentMonomerMolecules + getConvertedMonomer();
 	IFVERBOSELONG printf("imm = %lld\n",state.initialMonomerMolecules);
 #endif
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    commToState() has finished");
+#endif
 }
 
 void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
@@ -2306,7 +2377,6 @@ void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
  * equivalent of stirring.
  */
 void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
-
     StatePacket *in    = (StatePacket*)in_;
     StatePacket *inout = (StatePacket*)inout_;
 
@@ -2460,16 +2530,22 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 }
 
 int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ) {
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    Start MPI reduction (stirring)");
+#endif
 	reduces++;
 	Timer t;
     startTimer(&t);
     int r = PMPI_Allreduce(sendbuf, recvbuf, count, datatype, op, comm);
 
-	uint64_t rtime = readTimer(&t);
+	unsigned long long rtime = readTimer(&t);
 	total_rtime += rtime;
 	
     RANK printf("Reduce time (us) = %I64d for %zu bytes\n", rtime, stateCommSize);
 	lastReduceTime = rtime;
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("    MPI reduction (stirring) complete");
+#endif
     return r;
 }
 
@@ -2656,6 +2732,10 @@ MU_TEST_SUITE(test_suite) {
 /*  Parse and apply command line options */
 void argumentParsing(int argc, char *argv[], int *seed) {
 
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Start parsing of command line arguments");
+#endif
+
 	int arg_seed = 0;
 	rcount arg_syncevents = 0;
 	unsigned long long arg_synctime = 0;
@@ -2692,11 +2772,17 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	else {
 		RANK printf("Simulation time between each two synchronizations: %llu\n", state.synchTime);
 	}
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Parsing of command line arguments complete");
+#endif
 }
 
 // ************* end command line parsing *********
 
 int compute(void) {
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Starting simulation");
+#endif
 
 	RANK file_write_state(START);
 	RANK file_write_state(PROFILES);
@@ -2745,6 +2831,9 @@ int compute(void) {
 		RANK printf("About to synch, time = %f\n", state.time);
 
 #ifndef NO_COMM
+#if DEBUGLEVEL >= 1
+		RANK file_write_debug("  Starting synchronization");
+#endif
 		int reduceRes = 0;
 
 		MPI_Op myOp;
@@ -2781,6 +2870,9 @@ int compute(void) {
 		MPI_Op_free(&myOp);
 
 		commToState(&inStatePacket); // update the state after stirring
+#if DEBUGLEVEL >= 1
+		RANK file_write_debug("  Synchronization complete");
+#endif
 #ifdef MONO_AUDIT
 		monomerAudit("post communicate");
 #endif
@@ -2832,7 +2924,9 @@ int compute(void) {
 		state.nextSynchTime += state.synchTime;
 		state.nextSynchEvents += (rcount)((float)state.synchEvents/(float)numprocs);
     }
-   
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Simulation complete");
+#endif
     return 0;
 }
 
@@ -2855,8 +2949,15 @@ int main(int argc, char *argv[]) {
 	RANK printf("\n");
 
 	// Unit testing
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("");
+	RANK file_write_debug("Simply started. Starting unit testing");
+#endif
 	MU_RUN_SUITE(test_suite);
 	MU_REPORT();
+#if DEBUGLEVEL >= 1
+	RANK file_write_debug("Unit testing complete");
+#endif
 	
 	state.synchTime = SYNCH_TIME_INTERVAL;
 	state.synchEvents = SYNCH_EVENTS_INTERVAL;
