@@ -2745,14 +2745,14 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 #endif
 
 	int arg_seed = 0;
-	rcount arg_syncevents = 0;
-	unsigned long long arg_synctime = 0;
+	rcount arg_synchevents = 0;
+	unsigned long long arg_synchtime = 0;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
 		OPT_INTEGER('s', "seed", &arg_seed, "seed for PRNG"),
-		OPT_INTEGER('e', "syncevents", &arg_syncevents, "number of events between each two synchronizations"),
-		OPT_INTEGER('t', "time", &arg_synctime, "simulation time between each two synchronizations"),
+		OPT_INTEGER('e', "events", &arg_synchevents, "number of events between each two synchronizations"),
+		OPT_INTEGER('t', "simtime", &arg_synchtime, "simulation time between each two synchronizations"),
 		OPT_END(),
 	};
 	struct argparse argparse;
@@ -2766,20 +2766,27 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	else {
 		RANK printf("Seed: %d\n", *seed);
 	}
-	if (arg_syncevents != 0) {
-		state.synchEvents = arg_syncevents;
+	if (arg_synchevents != 0) {
+		state.synchEvents = arg_synchevents;
 		RANK printf("Overriding compiled number of events synchronization interval with user specified number: %llu\n", state.synchEvents);
 	}
 	else {
 		RANK printf("Number of events between each two synchronizations: %llu\n", state.synchEvents);
 	}
-	if (arg_synctime != 0) {
-		state.synchTime = arg_synctime;
+	if (arg_synchtime != 0) {
+		state.synchTime = arg_synchtime;
 		RANK printf("Overriding compiled simulation time synchronization interval with user specified time: %llu\n", state.synchTime);
 	}
 	else {
 		RANK printf("Simulation time between each two synchronizations: %llu\n", state.synchTime);
 	}
+
+	// Check if at least one sync interval is nonzero -- to be used in the future
+	if ((state.synchTime == 0) && (state.synchEvents == 0)) {
+		RANK printf("\nNo synchronization interval has been provided. Exiting...\n");
+		EXIT(EXIT_FAILURE);
+	}
+
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("Parsing of command line arguments complete");
 #endif
