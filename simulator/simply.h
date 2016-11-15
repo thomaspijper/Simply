@@ -22,6 +22,13 @@
 #include <sys/time.h>
 #endif
 
+ // Define inline directive for MSVC and GCC
+#if defined(_MSC_VER)
+#define INLINE __inline
+#elif defined(__GNUC__)
+#define INLINE inline
+#endif
+
 #define MAX_DATA_FILE 1000
 #define RATES_VEC_SIZE 10
 typedef double probability;
@@ -152,6 +159,6 @@ typedef struct {
 
 void print_state();
 
-inline const char *name(int index);
-inline const char *rname(int index);
+INLINE const char *name(int index);
+INLINE const char *rname(int index);
 void print_reaction(int reaction_index);

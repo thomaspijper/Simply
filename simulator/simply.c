@@ -132,7 +132,7 @@ int checkPointing = 0;
 static sysState state;
 
 
-// Define inline directives for MSVC and GCC
+// Define inline directive for MSVC and GCC
 #if defined(_MSC_VER)
   #define INLINE __inline
 #elif defined(__GNUC__)
@@ -307,15 +307,26 @@ double readTimerSec(Timer *t) {
 
 /* Get the current time (currently used for debugging only) */
 #if DEBUGLEVEL >= 1
-  #if defined(__GNUC__) // --------------------------------------------------------------- To be implemented (high priority) ------
-    #error Debugging not yet implemented for UNIX systems. Please set DEBGUGLEVEL as 0.
+INLINE void getSystemTimeString(char *timeStampString) {
+  #if defined(__GNUC__)
+	timeval fileTime;
+	tm systemTime;
+
+	gettimeofday(fileTime, NULL);
+	localtime_r(&fileTime.tv_sec, &systemTime);
+	long ms = fileTime.tv_usec / 1000;
+	snprintf(timeStampString, 27, "[%04d-%02d-%02d %02d:%02d:%02d:%03ld] ", systemTime.tm_year, systemTime.tm_mon, systemTime.tm_mday,
+																		    systemTime.tm_hour, systemTime.tm_min, systemTime.tm_sec,
+																		    ms);
   #elif defined(_MSC_VER)
-SYSTEMTIME getSystemTime(void) {
 	FILETIME fileTime;
-	SYSTEMTIME userSystemTime;
+	SYSTEMTIME systemTime;
+
 	GetSystemTimeAsFileTime(&fileTime);
-	FileTimeToSystemTime(&fileTime, &userSystemTime);
-	return userSystemTime;
+	FileTimeToSystemTime(&fileTime, &systemTime);
+	snprintf(timeStampString, 27, "[%04d-%02d-%02d %02d:%02d:%02d:%03d] ", systemTime.wYear, systemTime.wMonth, systemTime.wDay,
+		                                                                   systemTime.wHour, systemTime.wMinute, systemTime.wSecond,
+		                                                                   systemTime.wMilliseconds);
 }
   #endif
 #endif
@@ -761,12 +772,9 @@ void file_write_debug(const char *str) {
 	fileOpen(&log, logfname, "a");
 
 	// Write log info
-	char timeStamp[MAX_FILENAME_LEN] = "\0";
-	SYSTEMTIME systemTime = getSystemTime();
-	fprintf(log, "[%04d-%02d-%02d %02d:%02d:%02d:%03d] ", systemTime.wYear, systemTime.wMonth, systemTime.wDay, 
-			                                              systemTime.wHour, systemTime.wMinute, systemTime.wSecond, 
-			                                              systemTime.wMilliseconds);
-	fprintf(log, "%s\n", str);
+	char timeStampString[27] = "\0";
+	getSystemTimeString(timeStampString);
+	fprintf(log, "%s%s\n", timeStampString, str);
 	fflush(log);
 #if defined(__GNUC__)
 	fsync(log);
