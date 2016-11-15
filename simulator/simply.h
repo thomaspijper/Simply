@@ -93,8 +93,8 @@ typedef struct {
 
 	ptime			time;
 	ptime			maxTime;
-	unsigned long long	nextSynchTime;	// We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
-	unsigned long long	synchTime;		// We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
+	unsigned long long	nextSynchTime;	// In milliseconds. We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
+	unsigned long long	synchTime;		// In milliseconds. We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
 	Timer			wallTime;
 
 	rcount			events;
