@@ -2992,18 +2992,20 @@ int main(int argc, char *argv[]) {
 			printf("Exiting prematurely as %d node(s) ran out of reactions to perform\n\n", state.noMoreReactions);
 		}
 
-		printf("Total time (us): chatting = %llu (avg = %llu), working = %llu\n", total_rtime, (reduces > 0 ? (total_rtime / reduces) : 0), total_wtime);
+		printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
+		printf("Computational time (us): chatting = %llu (avg = %llu), working = %llu\n", total_rtime, (reduces > 0 ? (total_rtime / reduces) : 0), total_wtime);
+		printf("Averaged computational speed on node %d = %.4f events/us\n", myid, (float)(state.events) / (float)total_wtime);
 		printf("Parallel efficiency = %.1f\n", (float)total_wtime / (float)(total_wtime + total_rtime) * 100);
+		printf("\n");
 
 		rcount totalEvents = 0;
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			totalEvents += state.react_cnts[i];
 		}
 		printf("Total number of events (on all nodes) = %llu\n", totalEvents);
-
 		printf("Final conversion = %f\n", state.conversion);
 		printf("Final simulation time = %f\n", state.time);
-		printf("Wall time (s) = %.2f\n", readTimerSec(&state.wallTime));
+		printf("\n");
 
 #ifdef EXPLICIT_SYSTEM_STATE
 		compressState();
