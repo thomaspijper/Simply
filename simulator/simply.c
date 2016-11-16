@@ -90,15 +90,14 @@
 #define IFVERBOSENODES if (VERBOSENODES >= 1)
 
   // Debugging functions
-#define DEBUGLEVEL 1
+#define DEBUGLEVEL 0
   //#define TRACE 1
   //#define NO_COMM 1
 #define MONO_AUDIT
 
   // Aliases used for printing state infor to files
-#define FULL 0
+#define START 0
 #define PROFILES 1
-#define START 2
 
   // Aliases used for printing state info to screen
 #define PRESTIRR 0
@@ -582,7 +581,7 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
   #endif
 }
 
-/* Writes state information to files.
+/* Writes state information to files
 */
 void file_write_state(int mode) {
 	int i, j, offset, length;
@@ -725,45 +724,52 @@ void file_write_state(int mode) {
 		fprintf(events, "\n");
 
 	}
-	else if (mode == FULL) {
-	// Write MWD of each poly/complex species
 
-		char id[MAX_FILENAME_LEN];
-		snprintf(id, MAX_FILENAME_LEN, "%d", myid);
-
-		for (i = 0; i < NO_OF_MOLSPECS; i++) {
-			if ((i >= MAXSIMPLE) && (i < MAXPOLY)) {
-				char distfname[MAX_FILENAME_LEN] = "\0";
-				strAppend(distfname, name(i));
-				strAppend(distfname, "-");
-				strAppend(distfname, timeStr);
-				strAppend(distfname, "-node");
-				strAppend(distfname, id);
-				strAppend(distfname, ".csv");
-				FILE *dist;
-				fileOpen(&dist, distfname, "a");
-
-				fprintf(dist, "Chain length;Particle count;Concentration (umol/L)\n");
-				offset = state.mwds[i][0].maxEntries - 1;
-				length = 1;
-				for (j = offset; j < 2 * offset + 1; j++) {
-					if (state.mwds[i][0].mwd_tree[j] > 0) {
-						fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
-					}
-					length++;
-				}
-				fclose(dist);
-			}
-		}
-	}
 	fclose(conc);
 	fclose(rates);
 	fclose(ratecoeffs);
 	fclose(events);
 }
 
-void file_write_debug(const char *str) {
+/* Write MWD of each poly/complex species to files
+*/
+void file_write_MWDs(void) {
+	int i, j, offset, length;
+	char timeStr[MAX_FILENAME_LEN];
+	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)roundf(state.time));
+	char id[MAX_FILENAME_LEN];
+	snprintf(id, MAX_FILENAME_LEN, "%d", myid);
 
+	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+		if ((i >= MAXSIMPLE) && (i < MAXPOLY)) {
+			char distfname[MAX_FILENAME_LEN] = "\0";
+			strAppend(distfname, name(i));
+			strAppend(distfname, "-");
+			strAppend(distfname, timeStr);
+			strAppend(distfname, "-node");
+			strAppend(distfname, id);
+			strAppend(distfname, ".csv");
+			FILE *dist;
+			fileOpen(&dist, distfname, "a");
+
+			fprintf(dist, "Chain length;Particle count;Concentration (umol/L)\n");
+			offset = state.mwds[i][0].maxEntries - 1;
+			length = 1;
+			for (j = offset; j < 2 * offset + 1; j++) {
+				//if (state.mwds[i][0].mwd_tree[j] > 0) {
+					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
+				//}
+				length++;
+			}
+			fclose(dist);
+		}
+	}
+}
+
+/* Writes debug information to file
+*/
+#if DEBUGLEVEL >= 1
+void file_write_debug(const char *str) {
 	// Initialize writing of logfile
 	char logfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(logfname, "logfile");
@@ -784,6 +790,7 @@ void file_write_debug(const char *str) {
 	// Close log file
 	fclose(log);
 }
+#endif
 
 /* Picks a random reaction by scanning over the rates.
 *
@@ -3013,12 +3020,12 @@ int main(int argc, char *argv[]) {
 		printf("Final conversion = %f\n", state.conversion);
 		printf("Final simulation time = %f\n", state.time);
 		printf("\n");
+	}
 
 #ifdef EXPLICIT_SYSTEM_STATE
 		compressState();
 #endif
-		file_write_state(FULL);
-	}
+	file_write_MWDs();
 
 	MPI_Finalize();
 
