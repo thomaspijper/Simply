@@ -584,7 +584,6 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
 /* Writes state information to files
 */
 void file_write_state(int mode) {
-	int i, j, offset, length;
 	char timeStr[MAX_FILENAME_LEN];
 	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)roundf(state.time));
 
@@ -622,7 +621,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(conc, ";Temperature (K)");
 #endif
-		for (i = 0; i < NO_OF_MOLSPECS; i++) {
+		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 			fprintf(conc, ";%s (umol/L)", name(i));
 		}
 #ifdef CALCMOMENTSOFDIST
@@ -635,7 +634,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(rates, ";Temperature (K)");
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(rates, ";%s (mol L^-1 s^-1)", rname(i));
 		}
 		fprintf(rates, "\n");
@@ -645,7 +644,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(ratecoeffs, ";Temperature (K)");
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			if (state.reactions[i].arg_ms2 == NO_MOL) {
 				fprintf(ratecoeffs, ";%s (s^-1)", rname(i));
 			}
@@ -660,7 +659,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(events, ";Temperature (K)");
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(events, ";%s", rname(i));
 		}
 		fprintf(events, "\n");
@@ -672,7 +671,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(conc, ";%.2f", state.temp);
 #endif
-		for (i = 0; i < NO_OF_MOLSPECS; i++) {
+		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 			fprintf(conc, ";%e", 1e6*toConc(state.ms_cnts[i]));
 		}
 #ifdef CALCMOMENTSOFDIST
@@ -690,7 +689,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(rates, ";%.2f", state.temp);
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(rates, ";%e", state.reactProbTree[i + REACT_PROB_TREE_LEAVES - 1] / AVOGADRO / state.volume);
 		}
 		fprintf(rates, "\n");
@@ -700,7 +699,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(ratecoeffs, ";%.2f", state.temp);
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			if (state.reactions[i].arg_ms2 == NO_MOL) { // Unimolecular reaction
 				fprintf(ratecoeffs, ";%e", state.reactions[i].rc);
 			}
@@ -718,7 +717,7 @@ void file_write_state(int mode) {
 #ifdef SIMULATEHEATING
 		fprintf(events, ";%.2f", state.temp);
 #endif
-		for (i = 0; i < NO_OF_REACTIONS; i++) {
+		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(events, ";%llu", state.react_cnts[i]);
 		}
 		fprintf(events, "\n");
@@ -734,13 +733,12 @@ void file_write_state(int mode) {
 /* Write MWD of each poly/complex species to files
 */
 void file_write_MWDs(void) {
-	int i, j, offset, length;
 	char timeStr[MAX_FILENAME_LEN];
 	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)roundf(state.time));
 	char id[MAX_FILENAME_LEN];
 	snprintf(id, MAX_FILENAME_LEN, "%d", myid);
 
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		if ((i >= MAXSIMPLE) && (i < MAXPOLY)) {
 			char distfname[MAX_FILENAME_LEN] = "\0";
 			strAppend(distfname, name(i));
@@ -753,9 +751,9 @@ void file_write_MWDs(void) {
 			fileOpen(&dist, distfname, "a");
 
 			fprintf(dist, "Chain length;Particle count;Concentration (umol/L)\n");
-			offset = state.mwds[i][0].maxEntries - 1;
-			length = 1;
-			for (j = offset; j < 2 * offset + 1; j++) {
+			int offset = state.mwds[i][0].maxEntries - 1;
+			int length = 1;
+			for (int j = offset; j < 2 * offset + 1; j++) {
 				//if (state.mwds[i][0].mwd_tree[j] > 0) {
 					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
 				//}
@@ -2205,7 +2203,7 @@ void commToState(StatePacket **inStatePacket) {
 
 	// Collect total of each reaction event on node 0
 	for (int i = 0; i < NO_OF_REACTIONS; i++) {
-		if (myid == 0) {
+		RANK {
 			state.react_cnts[i] = (*inStatePacket)->react_cnts[i];
 		}
 		else {
@@ -3023,7 +3021,7 @@ int main(int argc, char *argv[]) {
 	}
 
 #ifdef EXPLICIT_SYSTEM_STATE
-		compressState();
+	compressState();
 #endif
 	file_write_MWDs();
 
