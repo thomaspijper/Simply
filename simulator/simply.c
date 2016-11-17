@@ -125,6 +125,7 @@ enum bools {False=0,True=1};
 int numprocs = -1;
 int64_t lastReduceTime = 0;
 int currentComparisonComplexity = -1;
+int mwdsMerged = 1;
 
 int checkPointing = 0;
 
@@ -148,8 +149,6 @@ int fetchpid(void) {
 }
 
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
-
-const int startsize = START_MWD_SIZE;
 
 int myid = -1;
 
@@ -392,8 +391,9 @@ void compressState(void) {
 		int arms = state.arms[i];
 		if (i >= MAXSIMPLE) {
 			printf("compressing %llu molecules of %s \n", state.ms_cnts[i], name(i));
+
 			// find maximum chain length to determine space required
-			chainLen maxLen = 0;
+			unsigned maxLenLocal = 0; // cannot use the variable 'chainLen' type as the type needs to be known by the MPI operation later
 			for (int j = 0; j < state.ms_cnts[i]; j++) {
 				chainLen *lengths = &state.expMols[i].mols[arms*j];
 				chainLen totalLen = 0;
@@ -401,9 +401,13 @@ void compressState(void) {
 				for (int a = 0; a < arms; a++) {
 					totalLen += lengths[a];
 				}
-				if (totalLen > maxLen)
-					maxLen = totalLen;
+				if (totalLen > maxLenLocal)
+					maxLenLocal = totalLen;
 			}
+
+			// make all nodes consider the same maximum chain length (necessary if we want to merge MWDs between nodes at a later time)
+			unsigned maxLen = 0;
+			MPI_Allreduce(&maxLenLocal, &maxLen, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
 			
 			// increase allocated memory to store system, if required
 			while (maxLen > state.mwds[i][0].maxEntries) {
@@ -417,7 +421,7 @@ void compressState(void) {
 
 			// build up MWDs
 			for (int j = 0; j < state.ms_cnts[i]; j++) {
-				chainLen *lengths = &state.expMols[i].mols[arms*j];
+				chainLen *lengths = &state.expMols[i].mols[arms * j];
 				chainLen totalLen = 0;
 
 				for (int a = 0; a < arms; a++) {
@@ -433,7 +437,7 @@ void compressState(void) {
 }
 
 /*
- * Converts compact representation to explicit representation. Requires debugging.
+ * Converts compact representation to explicit representation. Currently nonfunctional; requires review/debugging.
  */
 void decompressState(void) {
 	printf("decompressStateRunning... ");
@@ -465,6 +469,36 @@ void decompressState(void) {
 		}
 	}
 	printf("finished!\n");
+}
+
+/* Merges MWDs in compact representation to node 0. For use when dumping system contents */
+void mergeMWDs(void) {
+	if (numprocs < 2) { // Nothing to do
+		return;
+	}
+
+	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
+		if (i >= MAXSIMPLE) {
+
+			int offset = state.mwds[i][0].maxEntries - 1; //511
+			int treeSize = 2 * state.mwds[i][0].maxEntries - 1; //1023
+
+			// Retreive MWDs from all nodes
+			pcount *mwd_tree_combined = NULL;
+			RANK mwd_tree_combined = malloc((treeSize) * sizeof(pcount) * numprocs);
+			pcount *treePtr = state.mwds[i][0].mwd_tree;
+			MPI_Gather(treePtr, treeSize, MPI_UNSIGNED_LONG_LONG, mwd_tree_combined, treeSize, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
+
+			// Merge MWDs
+			RANK for (int j = offset; j < 2 * offset + 1; j++) { // 511 <= j < 1023 = 511
+				for (int k = 1; k < numprocs; k++) {
+					state.mwds[i][0].mwd_tree[j] += mwd_tree_combined[j + treeSize * k];
+				}
+			}
+			free(mwd_tree_combined);
+		}
+	}
+	mwdsMerged = numprocs;
 }
 
 /* For O(1) algorithm, uses large amounts of memory */
@@ -744,8 +778,6 @@ void file_write_MWDs(void) {
 			strAppend(distfname, name(i));
 			strAppend(distfname, "-");
 			strAppend(distfname, timeStr);
-			strAppend(distfname, "-node");
-			strAppend(distfname, id);
 			strAppend(distfname, ".csv");
 			FILE *dist;
 			fileOpen(&dist, distfname, "a");
@@ -755,7 +787,7 @@ void file_write_MWDs(void) {
 			int length = 1;
 			for (int j = offset; j < 2 * offset + 1; j++) {
 				//if (state.mwds[i][0].mwd_tree[j] > 0) {
-					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
+					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], (1e6*toConc(state.mwds[i][0].mwd_tree[j])/mwdsMerged));
 				//}
 				length++;
 			}
@@ -1015,8 +1047,8 @@ void initSysState(int seed) {
     /* enter all mols into mwds */
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
 		for (int a = 0; a < MAX_ARMS; a++) {
-	        state.mwds[i][a].maxEntries = startsize;
-	        state.mwds[i][a].mwd_tree = calloc(2 * startsize - 1, sizeof(pcount));
+	        state.mwds[i][a].maxEntries = START_MWD_SIZE;
+	        state.mwds[i][a].mwd_tree = calloc(2 * START_MWD_SIZE - 1, sizeof(pcount));
 		}
     }
 
@@ -1493,7 +1525,7 @@ void react(void) {
 
 // Prints the mwds and molecule counts
  void print_state() {
-    int             i, j, offset;
+    int i, j, offset;
 	printf("\n\n");
     for (i = 0; i < NO_OF_MOLSPECS; i++) {
         if (state.ms_cnts[i] > 0) {
@@ -1663,7 +1695,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
  void state_summary(int m) {
 
-	int distNo = 3; // zeroth, first, and second
+	int distNo = 3; // zeroth, first, and second moment of distribution
 
 	// Collect simulation times
 	ptime *workerStateTime = NULL;
@@ -3023,7 +3055,8 @@ int main(int argc, char *argv[]) {
 #ifdef EXPLICIT_SYSTEM_STATE
 	compressState();
 #endif
-	file_write_MWDs();
+	mergeMWDs();
+	RANK file_write_MWDs();
 
 	MPI_Finalize();
 
