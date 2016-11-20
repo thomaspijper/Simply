@@ -42,11 +42,14 @@ If you’re using Simply for research, please cite it as follows:
 
 ### License
 
-All code is released under the LGPL v3 license, with the exception of the dSFMT pseudorandom number generator (written by M. Saito and M. Matsumoto) which is released under the 3-clause BSD license.
+Simply’s code is released under the LGPL v3 license. Simply makes use of the following libraries, each of which carries its own license (see the corresponding source code for information):
+* [dSFMT](http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/SFMT/) by M. Saito and M. Matsumoto
+* [minunit](https://github.com/siu/minunit) by David Siñuela Pastor
+* [argparse](https://github.com/cofyc/argparse) by Yecheng Fu
 
 ### Contact
 
-Do you have suggestions, bug reports, feature requests, or do you just want to say hello? You can create an _issue_ on the Github page. If this for some reason doesn't suffice, feel free to drop me a line at tcpijper _at_ gmail _dot_ com. I’m always interested in feedback. As a novice programmer, I'm finding code-related feedback especially valuable.
+Do you have suggestions, bug reports, feature requests, or do you just want to say hello? You can create an _issue_ on the Github page. If this for some reason doesn’t suffice, feel free to drop me a line at tcpijper _at_ gmail _dot_ com. I’m always interested in feedback. As a novice programmer, I’m finding code-related feedback especially valuable.
 
 ### Disclaimer
 
