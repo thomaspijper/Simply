@@ -43,9 +43,9 @@ If you’re using Simply for research, please cite it as follows:
 ### License
 
 Simply’s code is released under the LGPL v3 license. Simply makes use of the following libraries, each of which carries its own license (see the corresponding source code for information):
-* [dSFMT](http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/SFMT/) by M. Saito and M. Matsumoto
-* [minunit](https://github.com/siu/minunit) by David Siñuela Pastor
-* [argparse](https://github.com/cofyc/argparse) by Yecheng Fu
+* [dSFMT](http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/SFMT/) by M. Saito and M. Matsumoto;
+* [minunit](https://github.com/siu/minunit) by David Siñuela Pastor;
+* [argparse](https://github.com/cofyc/argparse) by Yecheng Fu.
 
 ### Contact
 
