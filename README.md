@@ -28,10 +28,10 @@ Documentation is available on the project wiki ([link](https://github.com/thomas
 ### Citing
 If you’re using Simply for research, please cite it as follows:
 
-    Simply Monte Carlo simulation package[1], which is based on paraPolySim by 
+    Simply kinetic Monte Carlo simulation package[1], which is based on paraPolySim by 
     Chaffey-Millar et al.[2],[3]
 
-    [1] Simply, https://github.com/thomaspijper/Simply/
+    [1] Simply, by Thomas C. Pijper, https://github.com/thomaspijper/Simply/
     [2] H. Chaffey-Millar, D. Stewart, M. M. T. Chakravarty, G. Keller, C. 
         Barner-Kowollik Macromol. Theory Simul. 2007, 16, 575-592.
     [3] G. Keller, H. Chaffey-Millar, M. M. T. Chakravarty, D. Stewart, C. 
