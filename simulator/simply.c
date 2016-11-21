@@ -390,8 +390,6 @@ void compressState(void) {
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		int arms = state.arms[i];
 		if (i >= MAXSIMPLE) {
-			printf("compressing %llu molecules of %s \n", state.ms_cnts[i], name(i));
-
 			// find maximum chain length to determine space required
 			unsigned maxLenLocal = 0; // cannot use the variable 'chainLen' type as the type needs to be known by the MPI operation later
 			for (int j = 0; j < state.ms_cnts[i]; j++) {
