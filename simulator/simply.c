@@ -2676,9 +2676,9 @@ MU_TEST_SUITE(test_suite) {
 
 	MU_SUITE_CONFIGURE(&test_setup, &test_teardown);
 
-	RANK MU_RUN_TEST(myid_test);
-	RANK MU_RUN_TEST(dSFMT_test);
-	RANK MU_RUN_TEST(START_MWD_SIZE_test);
+	MU_RUN_TEST(myid_test);
+	MU_RUN_TEST(dSFMT_test);
+	MU_RUN_TEST(START_MWD_SIZE_test);
 }
 
 // ************* end testing code *********
@@ -2708,10 +2708,10 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	argc = argparse_parse(&argparse, argc, argv);
 	if (arg_seed != 0) {
 		*seed = arg_seed + myid;
-		RANK printf("Overriding compiled seed with user specified seed: %d\n", *seed);
+		RANK printf("Overriding compiled PRNG seed with user specified seed: %d\n", *seed);
 	}
 	else {
-		RANK printf("Seed: %d\n", *seed);
+		RANK printf("PRNG seed: %d\n", *seed);
 	}
 	if (arg_synchevents != 0) {
 		state.synchEvents = arg_synchevents;
@@ -2915,8 +2915,8 @@ int main(int argc, char *argv[]) {
 	RANK file_write_debug("");
 	RANK file_write_debug("Simply started. Starting unit testing");
 #endif
-	MU_RUN_SUITE(test_suite);
-	MU_REPORT();
+	RANK MU_RUN_SUITE(test_suite);
+	RANK MU_REPORT();
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("Unit testing complete");
 #endif
