@@ -2617,8 +2617,7 @@ void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
 
 // ************* start testing code *********
 
-/* We're going to test a few functions and constants that allow for testing. Extensive unit testing is not possible
-   as the code is not written modular. We'll have to test only what we can. */  
+/* We're going to test a few things. */  
 
 void test_setup() {
 	
@@ -2662,9 +2661,6 @@ MU_TEST(dSFMT_test) {
 	dsfmt_gv_init_gen_rand(1);
 	mu_assert_double_eq(0.1193544251137, randomProb(3));
 	randomProb(4);
-
-	// Reseed the PRNG for future use
-	dsfmt_gv_init_gen_rand(1);
 }
 
 /*  Test whether START_MWD_SIZE is a power of two */
@@ -2675,80 +2671,6 @@ MU_TEST(START_MWD_SIZE_test) {
 	mu_assert(value == value_test, "START_MWD_SIZE is not a power of two");
 }
 
-/*  Test the min_value() and max_value() functions */
-MU_TEST(minmax_test) {
-	mu_assert_int_eq(9223372036854775808, min_value(9223372036854775808, 9223372036854775809));
-	mu_assert_int_eq(9223372036854775809, max_value(9223372036854775808, 9223372036854775809));
-}
-
-/*  Test the takeSome() function by taking the sum of all takeSome(i) values for various values of i */
-MU_TEST(takeSome_test) {
-	for (int i = 0; i < (2 * numprocs); i++) {
-		pcount sendValue = takeSome(i);
-		pcount receiveValue;
-		MPI_Allreduce(&sendValue, &receiveValue, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
-		RANK mu_assert_int_eq(i, receiveValue);
-	}
-}
-
-/*  Test the leaveSome() function by taking the sum of all takeSome(i) values for various values of i, then checking if the pattern in the sums is correct */
-MU_TEST(leaveSome_test) {
-	pcount *sumvalues = NULL;
-	RANK sumvalues = malloc(sizeof(int) * numprocs * 2);
-	for (int i = 0; i < (2 * numprocs); i++) { // fetch sum of all leaveSome() values
-		pcount sendValue = leaveSome(i);
-		pcount receiveValue;
-		MPI_Allreduce(&sendValue, &receiveValue, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);
-		RANK sumvalues[i] = receiveValue;
-	}
-
-	int expectedValue = numprocs - 1;
-	RANK for (int i = 1; i < (2 * numprocs); i++) {
-		if (expectedValue < 0) {
-			expectedValue = numprocs - 1;
-		}
-		mu_assert_int_eq(expectedValue, (sumvalues[i] - sumvalues[i - 1]));
-		expectedValue--;
-	}
-	RANK free(sumvalues);
-}
-
-/*  Test the double_arraysize() function by expanding the size of a dummy array and verifying its contents */
-MU_TEST(double_arraysize_test) {
-	// Create test array
-	int curr_size = 16;
-	pcount testnumber = 1;
-	pcount *arr = malloc(sizeof(pcount) * curr_size);
-	for (int i = 0; i < curr_size; i++) {
-		arr[i] = i + testnumber;
-	}
-
-	// Double array size
-	double_arraysize(&arr, curr_size);
-
-	// Evaluate resulting array
-	mu_assert_int_eq(1, arr[0]); // First value in array
-	int base = 0;
-	int period = 2;
-	int expectedValue = testnumber;
-	int i = 1;
-	while (i < curr_size) {
-		for (int j = 0; j < period; j++) {
-			if (i <= (base + period / 2)) {
-				mu_assert_int_eq(expectedValue, arr[i]);
-				expectedValue++;
-			} else {
-				mu_assert_int_eq(0, arr[i]);
-			}
-			i++;
-		}
-		base += period;
-		period *= 2;
-	}
-
-	mu_assert_int_eq(expectedValue, arr[i]); // Last value in array
-}
-
 /* Tests to run */
 MU_TEST_SUITE(test_suite) {
 
@@ -2757,13 +2679,6 @@ MU_TEST_SUITE(test_suite) {
 	RANK MU_RUN_TEST(myid_test);
 	RANK MU_RUN_TEST(dSFMT_test);
 	RANK MU_RUN_TEST(START_MWD_SIZE_test);
-	RANK MU_RUN_TEST(minmax_test);
-	RANK MU_RUN_TEST(double_arraysize_test);
-
-	if (numprocs > 1) {
-		MU_RUN_TEST(takeSome_test);
-		MU_RUN_TEST(leaveSome_test);
-	}
 }
 
 // ************* end testing code *********
