@@ -1909,14 +1909,23 @@ void print_kinetic_model(void) {
 		printf("%d:\t%s\t%s\n",i,name(i),typeStr);
 	}
 	printf("\nKinetic model\n");
-	for (int i=0; i<NO_OF_REACTIONS; i++) {
-		reaction *p = state.reactions+i;
+	for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		reaction *p = state.reactions + i;
 		char *p1 = (char*)((p->res_ms1!=NO_MOL)?name(p->res_ms1):" ");
 		char *p2 = (char*)((p->res_ms2!=NO_MOL)?name(p->res_ms2):" ");
 		char *r1 = (char*)((p->arg_ms1!=NO_MOL)?name(p->arg_ms1):" ");
 		char *r2 = (char*)((p->arg_ms2!=NO_MOL)?name(p->arg_ms2):" ");
-		double k = state.reactions[i].rc;
-		printf("%d:\t%s\t+\t%s\t-->\t%s\t+\t%s\t k = %.5e\n",i,r1,r2,p1,p2,k);
+		double k;
+		if (p->arg_ms2 == NO_MOL) { // Unimolecular reaction
+			k = state.reactions[i].rc;
+		}
+		else if (p->arg_ms1 == p->arg_ms2) { // Bimolecular reaction with identical reactants
+			k = state.reactions[i].rc * state.volume * AVOGADRO / SZYMANSKI;
+		}
+		else { // Bimolecular reaction with nonidentical reactants
+			k = state.reactions[i].rc * state.volume * AVOGADRO;
+		}
+		printf("%d:\t%s\t+\t%s\t-->\t%s\t+\t%s\t k = %.5e\n", i, r1, r2, p1, p2, k);
 	}
 }
 
@@ -2738,8 +2747,6 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	RANK file_write_debug("Parsing of command line arguments complete");
 #endif
 }
-
-// ************* end command line parsing *********
 
 int compute(void) {
 #if DEBUGLEVEL >= 1
