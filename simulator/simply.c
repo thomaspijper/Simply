@@ -1017,9 +1017,6 @@ void initSysState(int seed) {
 	state.basetemp = BASETEMP;
 	state.temp = STARTTEMP;
 	state.deltatemp = state.temp - state.basetemp;
-	
-    /* reactions. used for temporary memory in pickRndReactions */
-    state.scan_scratch = calloc(NO_OF_REACTIONS, sizeof(probability));
 
 #ifdef CALCMOMENTSOFDIST
 	/* moments of distribution */

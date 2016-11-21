@@ -130,7 +130,6 @@ typedef struct {
 	pcount 			currentMonomerMolecules;
 	pcount			localMonomerParticles;
   
-	probability		*scan_scratch;
 	probability 	ratesVec[RATES_VEC_SIZE];
 	int 			ratesVecPos;
 	pcount 			tracerInitial;
