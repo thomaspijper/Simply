@@ -1025,7 +1025,7 @@ void initSysState(int seed) {
 	/* free volume */
 	state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 #endif
-    /* MWDS initialise those ms_cnts not set to 0. rely on malloc/memset for the rest */
+    /* MWD_INITS initialises those ms_cnts not set to 0. rely on malloc/memset for the rest */
     MWD_INITS
 
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
@@ -2097,6 +2097,7 @@ size_t stateCommHeaderBytes(void) {
 
 	return (sizeof(StatePacket)
 		  + sizeof(pcount)*NO_OF_MOLSPECS // Mol counts
+		  + sizeof(rcount)*NO_OF_REACTIONS // Reaction event counts
           + sizeof(unsigned)*TOTAL_ARMS);  // Maximum chain lengths
 }
 
@@ -2118,9 +2119,9 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 #endif
 
 	// Packet format
-	// [ Header                                    | Body                                 ]
-	// [ StatePacket    | pcount[]  | int[]        | pcount[] | pcount[] | ... | pcount[] ]
-	// [ outStatePacket | molCounts | maxChainLens | packetMWDs ...                    E  ]
+	// [ Header                                                  | Body                                 ]
+	// [ StatePacket    | pcount[]  | rcount[]    | int[]        | pcount[] | pcount[] | ... | pcount[] ]
+	// [ outStatePacket | molCounts | reactCounts | maxChainLens | packetMWDs ...                    E  ]
 	// outStatePacket is statepacket struct
 	// molCounts      is number of each species (NO_OF_MOLSPECS elts)
 	// maxChainLens   is the max. chain length stored for each dist, or MIN_MWD_SIZE, 
@@ -2134,14 +2135,17 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 	(*outStatePacket)->time = state.time;
     (*outStatePacket)->deltatemp = state.deltatemp;
 	(*outStatePacket)->globalAllMonomer = monomerCount() + getConvertedMonomer();
-	memcpy((*outStatePacket)->react_cnts, state.react_cnts, sizeof(rcount) * NO_OF_REACTIONS);
 
     // Define start of array containing total number of each species, then copy particle counts
 	pcount *molCounts = (pcount*)(*outStatePacket + 1);
 	memcpy(molCounts, state.ms_cnts, sizeof(pcount) * NO_OF_MOLSPECS);
 
+	// Define start of array containing total number of reaction events, then copy event counts
+	pcount *reactCounts = (rcount*)(molCounts + NO_OF_MOLSPECS);
+	memcpy(reactCounts, state.react_cnts, sizeof(rcount) * NO_OF_REACTIONS);
+
 	// Define start of array containing maximum chain lengths for each species, then copy maximum chain lengths
-	unsigned *maxChainLens = (unsigned*)(molCounts + NO_OF_MOLSPECS);
+	unsigned *maxChainLens = (unsigned*)(reactCounts + NO_OF_REACTIONS);
 	size_t bytesForMWDs = getMaxChainLens(maxChainLens); // While copying, also determine space needed to store MWDs on this worker
 
 	// Safety: check if stateCommSize is large enough
@@ -2237,24 +2241,23 @@ void commToState(StatePacket **inStatePacket) {
     state.time = (*inStatePacket)->time / numprocs;
 	state.deltatemp = (*inStatePacket)->deltatemp / numprocs;
 
-	// Collect total of each reaction event on node 0
+	pcount *speciesCounts = (pcount*)((*inStatePacket) + 1);
+	pcount *reactCounts = (rcount*)(speciesCounts + NO_OF_MOLSPECS);
+	unsigned *maxChainLens = (unsigned*)(reactCounts + NO_OF_REACTIONS);
+	pcount *mwd = (pcount*)(maxChainLens + TOTAL_ARMS);
+
+	// Send count of each reaction event on node 0, set counts on other nodes to 0
 	for (int i = 0; i < NO_OF_REACTIONS; i++) {
 		RANK {
-			state.react_cnts[i] = (*inStatePacket)->react_cnts[i];
+			state.react_cnts[i] = reactCounts[i];
 		}
 		else {
 			state.react_cnts[i] = 0;
 		}
 	}
 
-	pcount *speciesCounts = (pcount*)((*inStatePacket) + 1);
-	unsigned *maxChainLens = (unsigned*)(speciesCounts + NO_OF_MOLSPECS);
-
-	pcount *mwd = (pcount*)(maxChainLens + TOTAL_ARMS);
-
+	// Copy mwd trees into state and take some particles
 	int pos = 0;
-
-	// copy mwd trees into state and take some particles
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		if (i < MAXSIMPLE) {
 			// divide particles up amongst processes
@@ -2439,25 +2442,28 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 	inout->time += in->time;
 	inout->deltatemp += in->deltatemp;
 	inout->globalAllMonomer += in->globalAllMonomer;
-	for (int i = 0; i < NO_OF_REACTIONS; i++) {
-		inout->react_cnts[i] += in->react_cnts[i];
-	}
 
 	// Define layout of packet 'in'
 	pcount *specCounts_in = (pcount*)(in+1);
-	unsigned *maxChainLens_in = (unsigned*)(specCounts_in + NO_OF_MOLSPECS);
-
+	pcount *reactCounts_in = (rcount*)(specCounts_in + NO_OF_MOLSPECS);
+	unsigned *maxChainLens_in = (unsigned*)(reactCounts_in + NO_OF_REACTIONS);
 	pcount *mwd_in = (pcount*)(maxChainLens_in + TOTAL_ARMS);
 
 	// Define layout of packet 'inout'
 	pcount *specCounts_inout = (pcount*)(inout+1);
-	unsigned *maxChainLens_inout = (unsigned*)(specCounts_inout + NO_OF_MOLSPECS);
+	pcount *reactCounts_inout = (rcount*)(specCounts_inout + NO_OF_MOLSPECS);
+	unsigned *maxChainLens_inout = (unsigned*)(reactCounts_inout + NO_OF_REACTIONS);
 	pcount *mwd_inout = (pcount*)(maxChainLens_inout + TOTAL_ARMS);
 
 	pcount *mwd_inout_start = mwd_inout;
 	pcount *mwd_tmp = malloc(stateCommSize);
 	pcount *mwd_pos = mwd_tmp;
 	size_t totalLength = 0, miscBytes = 0;
+
+	// Merge reaction event counts
+	for (int i = 0; i < NO_OF_REACTIONS; i++) {
+		reactCounts_inout[i] += reactCounts_in[i];
+	}
 
 	// Merge species counts and MWDs
 	int pos = 0;
