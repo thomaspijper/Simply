@@ -411,7 +411,7 @@ void compressState(void) {
 			
 			// increase allocated memory to store system, if required
 			while (maxLen > state.mwds[i][0].maxEntries) {
-				printf("%s: mwd tree for %s doubled\n", __FUNCTION__, name(i));
+				//printf("%s: mwd tree for %s doubled\n", __FUNCTION__, name(i));
 				state.mwds[i][0].maxEntries *= 2;
 			}
 			size_t bytes = (2 * state.mwds[i][0].maxEntries - 1) * sizeof(pcount);
@@ -1028,7 +1028,7 @@ void initSysState(int seed) {
 	/* free volume */
 	state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 #endif
-    /* MWDS initialise those ms_cnts not set to 0. rely on calloc for the rest */
+    /* MWDS initialise those ms_cnts not set to 0. rely on malloc/memset for the rest */
     MWD_INITS
 
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
@@ -1045,7 +1045,9 @@ void initSysState(int seed) {
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
 		for (int a = 0; a < MAX_ARMS; a++) {
 	        state.mwds[i][a].maxEntries = START_MWD_SIZE;
-	        state.mwds[i][a].mwd_tree = calloc(2 * START_MWD_SIZE - 1, sizeof(pcount));
+	        state.mwds[i][a].mwd_tree = malloc((2 * START_MWD_SIZE - 1) * sizeof(pcount));
+			pcount *ptr = state.mwds[i][a].mwd_tree;
+			memset(ptr, 0, (2 * START_MWD_SIZE - 1) * sizeof(pcount));
 		}
     }
 
