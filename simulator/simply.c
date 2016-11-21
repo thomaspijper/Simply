@@ -1032,11 +1032,6 @@ void initSysState(int seed) {
 		state.ms_cnts[i] = takeSome(state.ms_cnts[i]);
 	}
 	
-	/* Quick initialization of reaction counts, can probably be done in a better way */
-	for (i = 0; i < NO_OF_REACTIONS; i++) {
-		state.react_cnts[i] = 0;
-	}
-
     /* initialise mwds */
     /* enter all mols into mwds */
 	for (i = 0; i < NO_OF_MOLSPECS; i++) {
