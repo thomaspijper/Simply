@@ -480,17 +480,16 @@ void mergeMWDs(void) {
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		if (i >= MAXSIMPLE) {
 
-			int offset = state.mwds[i][0].maxEntries - 1; //511
-			int treeSize = 2 * state.mwds[i][0].maxEntries - 1; //1023
+			int offset = state.mwds[i][0].maxEntries - 1;
+			int treeSize = 2 * state.mwds[i][0].maxEntries - 1;
 
 			// Retreive MWDs from all nodes
 			pcount *mwd_tree_combined = NULL;
 			RANK mwd_tree_combined = malloc((treeSize) * sizeof(pcount) * numprocs);
-			pcount *treePtr = state.mwds[i][0].mwd_tree;
-			MPI_Gather(treePtr, treeSize, MPI_UNSIGNED_LONG_LONG, mwd_tree_combined, treeSize, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
+			MPI_Gather((&state.mwds[i][0])->mwd_tree, treeSize, MPI_UNSIGNED_LONG_LONG, mwd_tree_combined, treeSize, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
 
 			// Merge MWDs
-			RANK for (int j = offset; j < 2 * offset + 1; j++) { // 511 <= j < 1023 = 511
+			RANK for (int j = offset; j < 2 * offset + 1; j++) {
 				for (int k = 1; k < numprocs; k++) {
 					state.mwds[i][0].mwd_tree[j] += mwd_tree_combined[j + treeSize * k];
 				}
@@ -1046,8 +1045,7 @@ void initSysState(int seed) {
 		for (int a = 0; a < MAX_ARMS; a++) {
 	        state.mwds[i][a].maxEntries = START_MWD_SIZE;
 	        state.mwds[i][a].mwd_tree = malloc((2 * START_MWD_SIZE - 1) * sizeof(pcount));
-			pcount *ptr = state.mwds[i][a].mwd_tree;
-			memset(ptr, 0, (2 * START_MWD_SIZE - 1) * sizeof(pcount));
+			memset((&state.mwds[i][a])->mwd_tree, 0, (2 * START_MWD_SIZE - 1) * sizeof(pcount));
 		}
     }
 
