@@ -786,9 +786,9 @@ void file_write_MWDs(void) {
 			int offset = state.mwds[i][0].maxEntries - 1;
 			int length = 1;
 			for (int j = offset; j < 2 * offset + 1; j++) {
-				//if (state.mwds[i][0].mwd_tree[j] > 0) {
+				if (state.mwds[i][0].mwd_tree[j] > 0) {
 					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], (1e6*toConc(state.mwds[i][0].mwd_tree[j])/mwdsMerged));
-				//}
+				}
 				length++;
 			}
 			fclose(dist);
