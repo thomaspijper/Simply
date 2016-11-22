@@ -129,19 +129,15 @@
 #endif
 
 enum bools {False=0,True=1};
+
 int numprocs = -1;
 unsigned long long lastReduceTime = 0;
 int currentComparisonComplexity = -1;
 int mwdsMerged = 1;
-
 int checkPointing = 0;
-
 static sysState state;
-
 static char dirname[MAX_FILENAME_LEN] = "\0";
-
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
-
 int myid = -1;
 
 void print_kinetic_model(void);
@@ -219,41 +215,42 @@ INLINE static double randomProb(int x) {
    particles accross all systems.
  */
 INLINE pcount takeSome(pcount total) {
-		pcount ans = total/numprocs;
-		pcount leftovers = total % (pcount)numprocs;
-		if (myid < leftovers)
-			ans++;
-		return ans;
+	pcount ans = total/numprocs;
+	pcount leftovers = total % (pcount)numprocs;
+	if (myid < leftovers) {
+		ans++;
+	}
+	return ans;
 }
 
 INLINE pcount leaveSome(pcount total) {
-		pcount rough = total/numprocs;
-		pcount leftovers = total % (pcount)numprocs;
-		pcount correction = (myid >= leftovers) ? leftovers : myid;
-		pcount ans = myid*rough + correction;
-		return ans;
+	pcount rough = total/numprocs;
+	pcount leftovers = total % (pcount)numprocs;
+	pcount correction = (myid >= leftovers) ? leftovers : myid;
+	pcount ans = myid*rough + correction;
+	return ans;
 }
 
 /* Deals with overflow of array containing mwd tree
  */
 void double_arraysize(pcount **arr, int curr_size) {
-  int newsize = 2 * curr_size;
-  pcount *new_arr = calloc(sizeof(pcount) * (2 * (size_t)newsize - 1), 1);
-  pcount *old_arr = *arr;
+	int newsize = 2 * curr_size;
+	pcount *new_arr = calloc(sizeof(pcount) * (2 * (size_t)newsize - 1), 1);
+	pcount *old_arr = *arr;
 
-  int p      = 1;  /* size of current level */
-  int src_ix = 0;  /* src index             */
-  int tgt_ix = 1;  /* target index          */
+	int p      = 1;  /* size of current level */
+	int src_ix = 0;  /* src index             */
+	int tgt_ix = 1;  /* target index          */
 
-  new_arr[0] = old_arr[0];
-  while (p < newsize) {
-    memcpy(&(new_arr[tgt_ix]), &(old_arr[src_ix]), p * sizeof(pcount));
-    src_ix += p;
-    p = 2*p;
-    tgt_ix = 2 * p - 1;
-  }
-  *arr = new_arr;
-  free (old_arr);
+	new_arr[0] = old_arr[0];
+	while (p < newsize) {
+		memcpy(&(new_arr[tgt_ix]), &(old_arr[src_ix]), p * sizeof(pcount));
+		src_ix += p;
+		p = 2*p;
+		tgt_ix = 2 * p - 1;
+	}
+	*arr = new_arr;
+	free (old_arr);
 }
 
 /* Appends string s2 to string s1. Both strings should be defined.
@@ -346,15 +343,16 @@ INLINE void getSystemTimeString(char *timeStampString) {
 
 // ************* end timer code ********
 
-/* Parses a string containing a path (currently only works for Windows) */
+/* Parses a string containing a path */
 void parseDirname(char* path) {
-
+#if defined(_MSC_VER)
 	// Check and repair a path that was placed between double quotes and than ended with a '\'
-	// such as "C:\Program Files\" as the final backslash will be seen as an escape character
+	// such as "C:\Data files\" as the final backslash will be seen as an escape character
 	size_t len = strlen(path);
 	if (path[len - 1] == '"') {
 		path[len - 1] = '\0';
 	}
+	// Append backslash if missing
 	len = strlen(path);
 	if (path[len - 1] != '\\') {
 		strAppend(path, "\\");
@@ -376,6 +374,31 @@ void parseDirname(char* path) {
 		RANK printf("\nError: invalid path specified (%s)\n", path);
 		exit(EXIT_FAILURE);
 	}
+#elif defined(__GNUC__)
+	// Append slash if missing
+	size_t len = strlen(path);
+	if (path[len - 1] != '/') {
+		strAppend(path, "/");
+	}
+
+	// Check if correct
+	DIR* dir = opendir(path);
+	if (dir) {
+		closedir(dir);
+		if (access(path, W_OK) != 0) {
+			RANK printf("\nError: path specified seems to be read-only (%s)\n", path);
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if (ENOENT == errno) {
+		RANK printf("\nError: invalid path specified (%s)\n", path);
+		exit(EXIT_FAILURE);
+	}
+	else {
+		RANK printf("\nUnknown error when trying to verify path (%s)\n", path);
+		exit(EXIT_FAILURE);
+	}
+#endif
 }
 
 void dumpTree(mwdStore *x) {
