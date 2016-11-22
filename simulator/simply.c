@@ -63,9 +63,11 @@
 #elif defined(_MSC_VER)
   #include <process.h>  // _getpid()
   #define getpid _getpid
+  #define WIN32_LEAN_AND_MEAN
+  #include <Windows.h>
 #endif
 
-  // Our own headers
+// Our own headers
 #include "dSFMT.h"
 #include "argparse.h"
 #include "minunit.h"
@@ -76,51 +78,57 @@
 
 #define RANK if (myid == 0)
 
-  // Control of random number generation
-  //#define CHANGE_SEED 1
+// Control of random number generation
+//#define CHANGE_SEED 1
 
-  //#define SCALING 1
+//#define SCALING 1
 
-  // Verbose options
+// Verbose options
 #define VERBOSE 1
 #define IFVERBOSE if (VERBOSE >= 1)
 #define IFVERBOSELONG if (VERBOSE >= 2)
 #define VERBOSENODES 1
 #define IFVERBOSENODES if (VERBOSENODES >= 1)
 
-  // Debugging functions
+// Debugging functions
 #define DEBUGLEVEL 0
-  //#define TRACE 1
-  //#define NO_COMM 1
+//#define TRACE 1
+//#define NO_COMM 1
 #define MONO_AUDIT
 
-  // Aliases used for printing state infor to files
+// Aliases used for printing state infor to files
 #define START 0
 #define PROFILES 1
 
-  // Aliases used for printing state info to screen
+// Aliases used for printing state info to screen
 #define PRESTIRR 0
 #define POSTSTIRR 1
 
 #define START_MWD_SIZE 512 // must be a power of 2
 #define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
-#define MAX_FILENAME_LEN 100
+#define MAX_FILENAME_LEN 255
 #define MAX_FILE_SIZE 1048576
 
 #define AVOGADRO 6.022140857E23
 
-  /* Number of PRNs to generate at a time.
-  Should not be smaller than 382 and must be an even number.
-  Changing this value will lead to different PRNs being generated. */
+/* Number of PRNs to generate at a time.
+   Should not be smaller than 382 and must be an even number.
+   Changing this value will lead to different PRNs being generated. */
 #define PRNG_ARRAY_SIZE 1000
 
-  // Messages for setting up data at start
+// Messages for setting up data at start
 #define SETUP_END 0
 #define SETUP_CONVDATA 1
 #define SETUP_SYSTEMSCALES 2
 
-enum bools {False=0,True=1};
+// Define inline directive for MSVC and GCC
+#if defined(_MSC_VER)
+  #define INLINE __inline
+#elif defined(__GNUC__)
+  #define INLINE inline
+#endif
 
+enum bools {False=0,True=1};
 int numprocs = -1;
 unsigned long long lastReduceTime = 0;
 int currentComparisonComplexity = -1;
@@ -130,13 +138,7 @@ int checkPointing = 0;
 
 static sysState state;
 
-
-// Define inline directive for MSVC and GCC
-#if defined(_MSC_VER)
-  #define INLINE __inline
-#elif defined(__GNUC__)
-  #define INLINE inline
-#endif
+static char dirname[MAX_FILENAME_LEN] = "\0";
 
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
 
@@ -173,7 +175,6 @@ static size_t rndCounter2 = PRNG_ARRAY_SIZE;
      randomProb(4) forces all arrays to be recomputed
  */
 INLINE static double randomProb(int x) {
-
 	if ((x == 0)
 		|| (x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
 		if (rndCounter0 == PRNG_ARRAY_SIZE) {
@@ -255,6 +256,26 @@ void double_arraysize(pcount **arr, int curr_size) {
   free (old_arr);
 }
 
+/* Appends string s2 to string s1. Both strings should be defined.
+*/
+void strAppend(char *s1, const char *s2) {
+	size_t len1 = strlen(s1);
+	size_t len2 = strlen(s2);
+	int count = (int)min_value(len2, MAX_FILENAME_LEN - len1 - 1);
+
+	// Concatenate the strings in a safe way
+#if defined(_MSC_VER)
+	int r = strncat_s(s1, MAX_FILENAME_LEN, s2, count);
+	if (r != 0) {
+		printf("Error while creating file name\nError code reported by strncat_s is %d\n", r);
+		exit(EXIT_FAILURE);
+	}
+#elif defined(__GNUC__)
+	strncat(s1, s2, count);
+	s1[MAX_FILENAME_LEN - 1] = "\0";
+#endif
+}
+
 // ************* begin timer code ********
 
 /* Start a timer */
@@ -320,6 +341,34 @@ INLINE void getSystemTimeString(char *timeStampString) {
 #endif
 
 // ************* end timer code ********
+
+/* Parses a string containing a path (currently only works for Windows) */
+void parseDirname(char* path) {
+
+	// Check and repair a path that was placed between double quotes and than ended with a '\'
+	// such as "C:\Program Files\" as the final backslash will be seen as an escape character
+	size_t len = strlen(path);
+	if (path[len - 1] == '"') {
+		path[len - 1] = '\0';
+	}
+	len = strlen(path);
+	if (path[len - 1] != '\\') {
+		strAppend(path, "\\");
+	}
+	
+	// Check if correct
+	int r = GetFileAttributes(path);
+	if (r < 0) {
+		RANK printf("\nError: invalid path specified (%s)\n", path);
+		exit(EXIT_FAILURE);
+	}
+	else if ((r & (1 << 4)) != 0) {
+		if ((r & 1) != 0) {
+			RANK printf("\nError: path specified is read-only (%s)\n", path);
+			exit(EXIT_FAILURE);
+		}
+	}
+}
 
 void dumpTree(mwdStore *x) {
 	for (size_t i = 1; i <= x->maxEntries; i *= 2) {
@@ -564,26 +613,6 @@ INLINE double toConc(long long ps) {
 	return (ps / AVOGADRO / state.volume);
 }
 
-/* Appends string s2 to string s1. Both strings should be defined.
-*/
-void strAppend(char *s1, const char *s2) {
-	size_t len1 = strlen(s1);
-	size_t len2 = strlen(s2);
-	int count = (int)min_value(len2, MAX_FILENAME_LEN - len1 - 1);
-
-	// Concatenate the strings in a safe way
-  #if defined(_MSC_VER)
-	int r = strncat_s(s1, MAX_FILENAME_LEN, s2, count);
-	if (r != 0) {
-		printf("Error while creating file name\nError code reported by strncat_s is %d\n", r);
-		exit(EXIT_FAILURE);
-	}
-  #elif defined(__GNUC__)
-	strncat(s1, s2, count);
-	s1[MAX_FILENAME_LEN - 1] = "\0";
-  #endif
-}
-
 /* Opens a file
 */
 void fileOpen(FILE **stream, const char *filename, const char *mode) {
@@ -610,6 +639,7 @@ void file_write_state(int mode) {
 
 	// Initialize writing of concentrations
 	char concfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(concfname, dirname);
 	strAppend(concfname, "concentrations");
 	strAppend(concfname, ".csv");
 	FILE *conc;
@@ -617,6 +647,7 @@ void file_write_state(int mode) {
 
 	// Initialize writing of rates
 	char ratesfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(ratesfname, dirname);
 	strAppend(ratesfname, "rates");
 	strAppend(ratesfname, ".csv");
 	FILE *rates;
@@ -624,6 +655,7 @@ void file_write_state(int mode) {
 
 	// Initialize writing of rate coefficients
 	char ratecoeffsfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(ratecoeffsfname, dirname);
 	strAppend(ratecoeffsfname, "ratecoeffs");
 	strAppend(ratecoeffsfname, ".csv");
 	FILE *ratecoeffs;
@@ -631,6 +663,7 @@ void file_write_state(int mode) {
 
 	// Initialize writing of reaction events
 	char eventsfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(eventsfname, dirname);
 	strAppend(eventsfname, "reactionevents");
 	strAppend(eventsfname, ".csv");
 	FILE *events;
@@ -762,6 +795,7 @@ void file_write_MWDs(void) {
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		if ((i >= MAXSIMPLE) && (i < MAXPOLY)) {
 			char distfname[MAX_FILENAME_LEN] = "\0";
+			strAppend(distfname, dirname);
 			strAppend(distfname, name(i));
 			strAppend(distfname, "-");
 			strAppend(distfname, timeStr);
@@ -789,6 +823,7 @@ void file_write_MWDs(void) {
 void file_write_debug(const char *str) {
 	// Initialize writing of logfile
 	char logfname[MAX_FILENAME_LEN] = "\0";
+	strAppend(logfname, dirname);
 	strAppend(logfname, "logfile");
 	strAppend(logfname, ".txt");
 	FILE *log;
@@ -2594,6 +2629,7 @@ void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
 
 	// Open the file
 	char fname[MAX_FILENAME_LEN] = "\0";
+	strAppend(fname, dirname);
 	strAppend(fname, "stateDump");
 	FILE *dump;
 	fileOpen(&dump, fname, "w");
@@ -2634,9 +2670,9 @@ MU_TEST(myid_test) {
 
 /*  Test whether whether PRNG_ARRAY_SIZE is set correctly and the PRNG gives the expected numbers (the latter ensures reproducibility of results) */
 MU_TEST(dSFMT_test) {
-	char value[MAX_FILENAME_LEN];
-	snprintf(value, MAX_FILENAME_LEN, "%d", DSFMT_N64);
-	char errormsg[MAX_FILENAME_LEN] = "PRNG_ARRAY_SIZE may not be smaller than \0";
+	char value[100];
+	snprintf(value, 100, "%d", DSFMT_N64);
+	char errormsg[100] = "PRNG_ARRAY_SIZE may not be smaller than \0";
 	strAppend(errormsg, value);
 	mu_assert(PRNG_ARRAY_SIZE >= DSFMT_N64, errormsg);
 	mu_assert((PRNG_ARRAY_SIZE % 2) == 0, "PRNG_ARRAY_SIZE must be an even number");
@@ -2694,12 +2730,14 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	int arg_seed = 0;
 	rcount arg_synchevents = 0;
 	unsigned long long arg_synchtime = 0;
+	char *arg_dirname = NULL;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
 		OPT_INTEGER('s', "seed", &arg_seed, "seed for PRNG"),
 		OPT_INTEGER('e', "events", &arg_synchevents, "number of events between each two synchronizations"),
 		OPT_INTEGER('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations"),
+		OPT_STRING('o', "output", &arg_dirname, "output directory"),
 		OPT_END(),
 	};
 	struct argparse argparse;
@@ -2726,6 +2764,11 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	}
 	else {
 		RANK printf("Simulation time between each two synchronizations: %llu\n", state.synchTime);
+	}
+	if (arg_dirname != NULL) {
+		parseDirname(arg_dirname);
+		strAppend(dirname, arg_dirname);
+		printf("User defined output path: %s\n", dirname);
 	}
 
 	// Check if at least one sync interval is nonzero -- to be used in the future
