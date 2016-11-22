@@ -54,13 +54,6 @@ header = """/*
 #include <math.h>
 \n"""
 
-# Visual Studio compiler needs this
-_MCS_VER = """#if defined(_MSC_VER)
-  #define WIN32_LEAN_AND_MEAN
-  #include <windows.h>
-#endif
-\n"""
-
 def getOut(outputfile, deletionFlag):
     if deletionFlag == True and os.path.isfile(outputfile):
         os.remove(outputfile)
@@ -151,7 +144,6 @@ def main():
 
     # Write output
     write.header(outputfile,header)
-    write._MCS_VER(outputfile,_MCS_VER)
     write.GLOBAL_MONOMER_PARTICLES(outputfile,generalDict,moleculesList)
     write.SEED(outputfile,generalDict)
     write.endingCriteria(outputfile,generalDict)
