@@ -2674,10 +2674,8 @@ MU_TEST(myid_test) {
 
 /*  Test whether whether PRNG_ARRAY_SIZE is set correctly and the PRNG gives the expected numbers (the latter ensures reproducibility of results) */
 MU_TEST(dSFMT_test) {
-	char value[100];
-	snprintf(value, 100, "%d", DSFMT_N64);
-	char errormsg[100] = "PRNG_ARRAY_SIZE may not be smaller than \0";
-	strAppend(errormsg, value);
+	char errormsg[100];
+	snprintf(errormsg, 100, "PRNG_ARRAY_SIZE may not be smaller than %d\0", DSFMT_N64);
 	mu_assert(PRNG_ARRAY_SIZE >= DSFMT_N64, errormsg);
 	mu_assert((PRNG_ARRAY_SIZE % 2) == 0, "PRNG_ARRAY_SIZE must be an even number");
 
