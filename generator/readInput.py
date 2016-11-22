@@ -927,7 +927,7 @@ class readInput(object):
     def readGroup(self, file, group):
         
         # Initialize some variables
-        no_lines = self.lineCount(file)
+        no_lines = self.lineCount(file) # length of the file
         beginFound = False
         endFound = False
         list = []
@@ -943,7 +943,10 @@ class readInput(object):
                 # Remove hex characters that are sometimes present at the start of the file
                 line = re.sub(r'[^\w#\s]', '', line)
                 
-                # Are we there yet?
+                # First look for the begin of the group. Then, for lines with data, add the line number to the 
+                # list. Keep doing until end of the group is reached.
+                if line == '':
+                    continue
                 if beginFound == False and endFound == False:
                     if line == 'begin ' + group:
                         beginFound = True
