@@ -357,8 +357,8 @@ void parseDirname(char* path) {
 	}
 	
 	// Check if correct
-	int r = GetFileAttributes(path);
-	if (r < 0) {
+	DWORD r = GetFileAttributes(path);
+	if (r == INVALID_FILE_ATTRIBUTES) {
 		RANK printf("\nError: invalid path specified (%s)\n", path);
 		exit(EXIT_FAILURE);
 	}
