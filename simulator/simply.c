@@ -261,6 +261,10 @@ void double_arraysize(pcount **arr, int curr_size) {
 void strAppend(char *s1, const char *s2) {
 	size_t len1 = strlen(s1);
 	size_t len2 = strlen(s2);
+	if ((len1 + len2) > MAX_FILENAME_LEN) {
+		printf("\nError: concatenation of the strings \n\n    \"%s\"\n\nand\n\n    \"%s\"\n\nwould result in a string that exceeds the maximum permitted length. Aborting...\n", s1, s2);
+		exit(EXIT_FAILURE);
+	}
 	int count = (int)min_value(len2, MAX_FILENAME_LEN - len1 - 1);
 
 	// Concatenate the strings in a safe way
