@@ -44,7 +44,6 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
-#include <inttypes.h>
 #include <assert.h>
 #include <limits.h>
 #include <float.h>
@@ -62,10 +61,8 @@
   #define _GNU_SOURCE
   #define _BSD_SOURCE
 #elif defined(_MSC_VER)
-// Compilation succeeds even without these #includes...?
-  //#include <process.h>
-  //#define WIN32_LEAN_AND_MEAN
-  //#include <windows.h>
+  #include <process.h>  // _getpid()
+  #define getpid _getpid
 #endif
 
   // Our own headers
@@ -125,7 +122,7 @@
 enum bools {False=0,True=1};
 
 int numprocs = -1;
-int64_t lastReduceTime = 0;
+unsigned long long lastReduceTime = 0;
 int currentComparisonComplexity = -1;
 int mwdsMerged = 1;
 
@@ -140,15 +137,6 @@ static sysState state;
 #elif defined(__GNUC__)
   #define INLINE inline
 #endif
-
-// Declare fetchpid() for Windows and Linux systems
-int fetchpid(void) {
-#if defined(_MSC_VER)
-	return _getpid();
-#elif defined(__GNUC__)
-	return getpid();
-#endif
-}
 
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
 
@@ -2853,7 +2841,7 @@ int compute(void) {
 	
 #ifdef CHANGE_SEED
 		// generate new seed
-		int nextSeed = lastReduceTime+fetchpid();
+		int nextSeed = lastReduceTime + getpid();
 		dsfmt_gv_init_gen_rand(nextSeed);
 //		printf("new random seed is %d\n",nextSeed);
 #endif
@@ -2934,7 +2922,7 @@ int main(int argc, char *argv[]) {
 	state.synchTime = SYNCH_TIME_INTERVAL;
 	state.synchEvents = SYNCH_EVENTS_INTERVAL;
 #ifndef SEED
-    int seed = fetchpid();
+    int seed = getpid();
 #else
 	int seed = SEED + myid;
 #endif

@@ -17,7 +17,6 @@
  */
 
 #include "genpolymer.h"
-#include <inttypes.h>
 #if defined(__GNUC__)
 #include <sys/time.h>
 #endif
