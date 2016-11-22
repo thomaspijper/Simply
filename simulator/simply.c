@@ -362,11 +362,15 @@ void parseDirname(char* path) {
 		RANK printf("\nError: invalid path specified (%s)\n", path);
 		exit(EXIT_FAILURE);
 	}
-	else if ((r & (1 << 4)) != 0) {
-		if ((r & 1) != 0) {
+	else if (r & FILE_ATTRIBUTE_DIRECTORY) {
+		if (r & FILE_ATTRIBUTE_READONLY) {
 			RANK printf("\nError: path specified is read-only (%s)\n", path);
 			exit(EXIT_FAILURE);
 		}
+	}
+	else {
+		RANK printf("\nError: invalid path specified (%s)\n", path);
+		exit(EXIT_FAILURE);
 	}
 }
 
