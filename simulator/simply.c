@@ -1041,7 +1041,7 @@ void setupParallelData() {
  * 
  * From CodeGen polysim.c.
  */
-void initSysState(int seed) {
+void initSysState(unsigned seed) {
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("Start initialization of the simulation");
 #endif
@@ -2750,22 +2750,22 @@ MU_TEST_SUITE(test_suite) {
 
 
 /*  Parse and apply command line options */
-void argumentParsing(int argc, char *argv[], int *seed) {
+void argumentParsing(int argc, char *argv[], unsigned *seed) {
 
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("Start parsing of command line arguments");
 #endif
 
-	int arg_seed = MAXINT;
-	long long arg_synchevents = MAXLONGLONG;
-	long long arg_synchtime = MAXLONGLONG;
+	unsigned arg_seed = UINT_MAX;
+	unsigned arg_synchevents = UINT_MAX;
+	unsigned arg_synchtime = UINT_MAX;
 	char *arg_dirname = NULL;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
-		OPT_INTEGER('s', "seed", &arg_seed, "seed for PRNG"),
-		OPT_LONGLONG('e', "events", &arg_synchevents, "number of events between each two synchronizations"),
-		OPT_LONGLONG('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations"),
+		OPT_UINT('s', "seed", &arg_seed, "seed for PRNG (allowed range: 0 - 4294967294))"),
+		OPT_UINT('e', "events", &arg_synchevents, "number of events between each two synchronizations (allowed range: 0 - 4294967294)"),
+		OPT_UINT('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations (allowed range: 0 - 4294967294)"),
 		OPT_STRING('o', "output", &arg_dirname, "output directory"),
 		OPT_END(),
 	};
@@ -2773,21 +2773,21 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	argparse_init(&argparse, options, usages, 0);
 	argparse_describe(&argparse, "\nSimply - kinetic Monte Carlo simulator for polymerizations.", "\n");
 	argc = argparse_parse(&argparse, argc, argv);
-	if (arg_seed != MAXINT) {
+	if (arg_seed != UINT_MAX) {
 		*seed = arg_seed + myid;
-		RANK printf("Overriding compiled PRNG seed with user specified seed: %d\n", *seed);
+		RANK printf("Overriding compiled PRNG seed with user specified seed: %u\n", *seed);
 	}
 	else {
-		RANK printf("PRNG seed: %d\n", *seed);
+		RANK printf("PRNG seed: %u\n", *seed);
 	}
-	if (arg_synchevents != MAXLONGLONG) {
+	if (arg_synchevents != UINT_MAX) {
 		state.synchEvents = (rcount)arg_synchevents;
 		RANK printf("Overriding compiled number of events synchronization interval with user specified number: %llu\n", state.synchEvents);
 	}
 	else {
 		RANK printf("Number of events between each two synchronizations: %llu\n", state.synchEvents);
 	}
-	if (arg_synchtime != MAXLONGLONG) {
+	if (arg_synchtime != UINT_MAX) {
 		state.synchTime = (unsigned long long)arg_synchtime;
 		RANK printf("Overriding compiled simulation time synchronization interval with user specified time (ms): %llu\n", state.synchTime);
 	}
@@ -2913,9 +2913,9 @@ int compute(void) {
 	
 #ifdef CHANGE_SEED
 		// generate new seed
-		int nextSeed = lastReduceTime + getpid();
+		unsigned nextSeed = (unsigned)(lastReduceTime + getpid());
 		dsfmt_gv_init_gen_rand(nextSeed);
-//		printf("new random seed is %d\n",nextSeed);
+//		printf("new random seed is %u\n",nextSeed);
 #endif
 
 		// Recalculate what's needed
@@ -2994,9 +2994,9 @@ int main(int argc, char *argv[]) {
 	state.synchTime = SYNCH_TIME_INTERVAL;
 	state.synchEvents = SYNCH_EVENTS_INTERVAL;
 #ifndef SEED
-    int seed = getpid();
+    unsigned seed = getpid();
 #else
-	int seed = SEED + myid;
+	unsigned seed = SEED + myid;
 #endif
 
 	argumentParsing(argc, argv, &seed);
