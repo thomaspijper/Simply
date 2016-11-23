@@ -55,6 +55,7 @@ enum argparse_option_type {
     ARGPARSE_OPT_BIT,
     /* options with arguments (optional or required) */
     ARGPARSE_OPT_INTEGER,
+	ARGPARSE_OPT_LONGLONG,
     ARGPARSE_OPT_STRING,
 };
 
@@ -125,13 +126,14 @@ int argparse_help_cb(struct argparse *self,
                      const struct argparse_option *option);
 
 // built-in option macros
-#define OPT_END()        { ARGPARSE_OPT_END, 0, NULL, NULL, 0, NULL }
-#define OPT_BOOLEAN(...) { ARGPARSE_OPT_BOOLEAN, __VA_ARGS__ }
-#define OPT_BIT(...)     { ARGPARSE_OPT_BIT, __VA_ARGS__ }
-#define OPT_INTEGER(...) { ARGPARSE_OPT_INTEGER, __VA_ARGS__ }
-#define OPT_STRING(...)  { ARGPARSE_OPT_STRING, __VA_ARGS__ }
-#define OPT_GROUP(h)     { ARGPARSE_OPT_GROUP, 0, NULL, NULL, h, NULL }
-#define OPT_HELP()       OPT_BOOLEAN('h', "help", NULL,                 \
+#define OPT_END()         { ARGPARSE_OPT_END, 0, NULL, NULL, 0, NULL }
+#define OPT_BOOLEAN(...)  { ARGPARSE_OPT_BOOLEAN, __VA_ARGS__ }
+#define OPT_BIT(...)      { ARGPARSE_OPT_BIT, __VA_ARGS__ }
+#define OPT_INTEGER(...)  { ARGPARSE_OPT_INTEGER, __VA_ARGS__ }
+#define OPT_LONGLONG(...) { ARGPARSE_OPT_LONGLONG, __VA_ARGS__ }
+#define OPT_STRING(...)   { ARGPARSE_OPT_STRING, __VA_ARGS__ }
+#define OPT_GROUP(h)      { ARGPARSE_OPT_GROUP, 0, NULL, NULL, h, NULL }
+#define OPT_HELP()        OPT_BOOLEAN('h', "help", NULL,                 \
                                      "show this help message and exit", \
                                      argparse_help_cb)
 

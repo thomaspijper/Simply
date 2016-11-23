@@ -647,19 +647,19 @@ INLINE double toConc(long long ps) {
 /* Opens a file
 */
 void fileOpen(FILE **stream, const char *filename, const char *mode) {
-  #if defined(_MSC_VER)
+#if defined(_MSC_VER)
 	int r = fopen_s(stream, filename, mode);
 	if (r != 0) {
 		printf("Could not open file %s\nError code produced by fopen_s is %d\n", filename, r);
 		exit(EXIT_FAILURE);
 	}
-  #elif defined(__GNUC__)
+#elif defined(__GNUC__)
 	*stream = fopen(filename, mode);
 	if (*stream == NULL) {
 		printf("Could not open file %s\n", filename);
 		exit(EXIT_FAILURE);
 	}
-  #endif
+#endif
 }
 
 /* Writes state information to files
@@ -1448,8 +1448,8 @@ void react(void) {
 		}
 
 		// Integer overflow protection
-		if ((prod1_lens[0] >= CHAINLENLIMIT) ||
-			(prod2_lens[0] >= CHAINLENLIMIT)) {
+		if ((prod1_lens[0] == CHAINLENLIMIT) ||
+			(prod2_lens[0] == CHAINLENLIMIT)) {
 			printf("\nError: a particle of species %s on node %d has reached its maximum chain length.\nWriting data and exiting...\n\n", name(prod1_ind), myid);
 			printf("\nNode %d exited with errors\n", myid);
 			exit(EXIT_FAILURE);
@@ -2756,16 +2756,16 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	RANK file_write_debug("Start parsing of command line arguments");
 #endif
 
-	int arg_seed = 0;
-	rcount arg_synchevents = 0;
-	unsigned long long arg_synchtime = 0;
+	int arg_seed = MAXINT;
+	long long arg_synchevents = MAXLONGLONG;
+	long long arg_synchtime = MAXLONGLONG;
 	char *arg_dirname = NULL;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
 		OPT_INTEGER('s', "seed", &arg_seed, "seed for PRNG"),
-		OPT_INTEGER('e', "events", &arg_synchevents, "number of events between each two synchronizations"),
-		OPT_INTEGER('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations"),
+		OPT_LONGLONG('e', "events", &arg_synchevents, "number of events between each two synchronizations"),
+		OPT_LONGLONG('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations"),
 		OPT_STRING('o', "output", &arg_dirname, "output directory"),
 		OPT_END(),
 	};
@@ -2773,22 +2773,22 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 	argparse_init(&argparse, options, usages, 0);
 	argparse_describe(&argparse, "\nSimply - kinetic Monte Carlo simulator for polymerizations.", "\n");
 	argc = argparse_parse(&argparse, argc, argv);
-	if (arg_seed != 0) {
+	if (arg_seed != MAXINT) {
 		*seed = arg_seed + myid;
 		RANK printf("Overriding compiled PRNG seed with user specified seed: %d\n", *seed);
 	}
 	else {
 		RANK printf("PRNG seed: %d\n", *seed);
 	}
-	if (arg_synchevents != 0) {
-		state.synchEvents = arg_synchevents;
+	if (arg_synchevents != MAXLONGLONG) {
+		state.synchEvents = (rcount)arg_synchevents;
 		RANK printf("Overriding compiled number of events synchronization interval with user specified number: %llu\n", state.synchEvents);
 	}
 	else {
 		RANK printf("Number of events between each two synchronizations: %llu\n", state.synchEvents);
 	}
-	if (arg_synchtime != 0) {
-		state.synchTime = arg_synchtime;
+	if (arg_synchtime != MAXLONGLONG) {
+		state.synchTime = (unsigned long long)arg_synchtime;
 		RANK printf("Overriding compiled simulation time synchronization interval with user specified time (ms): %llu\n", state.synchTime);
 	}
 	else {
@@ -2802,7 +2802,7 @@ void argumentParsing(int argc, char *argv[], int *seed) {
 
 	// Check if at least one sync interval is nonzero -- to be used in the future
 	if ((state.synchTime == 0) && (state.synchEvents == 0)) {
-		RANK printf("\nNo synchronization interval has been provided. Exiting...\n");
+		RANK printf("\nNo valid synchronization interval has been provided. Exiting...\n");
 		exit(EXIT_FAILURE);
 	}
 
