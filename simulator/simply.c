@@ -489,7 +489,7 @@ void compressState(void) {
 			MPI_Allreduce(&maxLenLocal, &maxLen, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
 			
 			// increase allocated memory to store system, if required
-			while (maxLen > state.mwds[i][0].maxEntries) {
+			while (maxLen > (unsigned)state.mwds[i][0].maxEntries) {
 				//printf("%s: mwd tree for %s doubled\n", __FUNCTION__, name(i));
 				state.mwds[i][0].maxEntries *= 2;
 			}
@@ -584,7 +584,7 @@ INLINE void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int d
 	pcount molecules = state.ms_cnts[spec_ind];
 
 	if (molecules > state.expMols[spec_ind].maxMolecules) {
-		state.expMols[spec_ind].maxMolecules *= 1.5;
+		state.expMols[spec_ind].maxMolecules = (pcount)((double)state.expMols[spec_ind].maxMolecules * 1.5);
 		printf("Explicit sys state expanded for species %s from %llu to %llu\n", name(spec_ind), (molecules-1), state.expMols[spec_ind].maxMolecules);
 		chainLen *old = state.expMols[spec_ind].mols;
 		state.expMols[spec_ind].mols = malloc(state.expMols[spec_ind].maxMolecules*arms*sizeof(chainLen));
@@ -606,7 +606,7 @@ INLINE pcount monomerCount() {
 }
 
 INLINE float conversion(void) {
-	float conversion = ((float)state.localMonomerParticles*state.scaleFactor - (float)state.currentMonomerMolecules) / ((float)state.localMonomerParticles*state.scaleFactor);
+	float conversion = ((float)state.localMonomerParticles * (float)state.scaleFactor - (float)state.currentMonomerMolecules) / ((float)state.localMonomerParticles*state.scaleFactor);
 	return conversion;
 }
 
@@ -677,7 +677,7 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
 */
 void file_write_state(int mode) {
 	char timeStr[MAX_FILENAME_LEN];
-	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)roundf(state.time));
+	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)round(state.time));
 
 	// Initialize writing of concentrations
 	char concfname[MAX_FILENAME_LEN] = "\0";
@@ -834,7 +834,7 @@ void file_write_state(int mode) {
 */
 void file_write_MWDs(void) {
 	char timeStr[MAX_FILENAME_LEN];
-	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)roundf(state.time));
+	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)round(state.time));
 	char id[MAX_FILENAME_LEN];
 	snprintf(id, MAX_FILENAME_LEN, "%d", myid);
 
@@ -1296,9 +1296,9 @@ INLINE const char *rname(int index) {
 /* Scales number of particles and (rate coefficients accordingly) by
  * factor.
  */
-void scaleSystem(float factor) {
+void scaleSystem(double factor) {
 
-	if (factor < 1.0F) {
+	if (factor < 1.0) {
 		printf("Scaling factors < 1 not yet dealt with\n");
 		abort();
 	}
@@ -1308,19 +1308,19 @@ void scaleSystem(float factor) {
 
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		if (i < MAXSIMPLE) {
-			state.ms_cnts[i] *= factor;
+			state.ms_cnts[i] = (pcount)((double)state.ms_cnts[i] * factor);
 			continue;
 		}
 
-		for (int a=0; a < state.arms[i]; a++) {
+		for (int a = 0; a < state.arms[i]; a++) {
 			int j;
-			for (j=0; j < state.mwds[i][a].maxEntries-1; j++) {
-				state.mwds[i][a].mwd_tree[j] *= factor;
+			for (j = 0; j < state.mwds[i][a].maxEntries-1; j++) {
+				state.mwds[i][a].mwd_tree[j] = (pcount)((double)state.mwds[i][a].mwd_tree[j] * factor);
 			}
 
 			pcount total = 0;
-			for (j=state.mwds[i][a].maxEntries-1; j < state.mwds[i][a].maxEntries*2-1; j++) {
-				state.mwds[i][a].mwd_tree[j] *= factor;
+			for (j = state.mwds[i][a].maxEntries-1; j < state.mwds[i][a].maxEntries*2-1; j++) {
+				state.mwds[i][a].mwd_tree[j] = (pcount)((double)state.mwds[i][a].mwd_tree[j] * factor);
 				total += state.mwds[i][a].mwd_tree[j];
 			}
 //			printf("System scale: %s changed to %lld particles\n",name(i),total);
@@ -1335,8 +1335,8 @@ void scaleSystem(float factor) {
 		}
 	}
 
-	state.initialMonomerMolecules *= factor;
-	state.currentMonomerMolecules *= factor;
+	state.initialMonomerMolecules = (pcount)((double)state.initialMonomerMolecules * factor);
+	state.currentMonomerMolecules = (pcount)((double)state.currentMonomerMolecules * factor);
 	state.volume *= factor;
 
 	printf("System scaled by factor of %f\n",factor);
@@ -1676,11 +1676,11 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 	// Temperature
 	if (m == PRESTIRR) {
 		for (int i = 0; i < nodesToPrint; i++) {
-			printf("Temperature (K) on node %d = %.2f\n", i, (roundf(simtemps[i] * 100) / 100));
+			printf("Temperature (K) on node %d = %.2f\n", i, (round(simtemps[i] * 100) / 100));
 		}
 	}
 	else if (m == POSTSTIRR) {
-		printf("Temperature (K) = %.2f\n", (roundf(simtemps[0] * 100) / 100));
+		printf("Temperature (K) = %.2f\n", (round(simtemps[0] * 100) / 100));
 	}
 	printf("\n");
 #endif
@@ -2063,7 +2063,7 @@ size_t stateCommSize = INIT_STATE_COMM_SIZE;
 /* Performs a+b=c for an array
  */
 INLINE void dvecAdd(pcount *c, pcount *a, pcount *b, unsigned n) {
-	for (int i = 0; i < n; i++) {
+	for (size_t i = 0; i < n; i++) {
 			c[i] = a[i] + b[i];
 	}
 }
@@ -2353,7 +2353,7 @@ void commToState(StatePacket **inStatePacket) {
 					if (molsAddedSoFar >= state.expMols[i].maxMolecules) {
 						IFVERBOSE printf("masf = %llu mm = %llu\n", molsAddedSoFar, state.expMols[i].maxMolecules);
 						printf("system state expanded for %s in commToState\n", name(i));
-						state.expMols[i].maxMolecules *= 1.5;
+						state.expMols[i].maxMolecules = (pcount)((double)state.expMols[i].maxMolecules * 1.5);
 						chainLen *old = state.expMols[i].mols;
 						state.expMols[i].mols = malloc(sizeof(chainLen)*state.expMols[i].maxMolecules);
 						memcpy(state.expMols[i].mols, old, sizeof(chainLen)*molsAddedSoFar);
@@ -2389,15 +2389,15 @@ void commToState(StatePacket **inStatePacket) {
 			qsort(list, maxChainLens[pos], sizeof(chainLen)*(size_t)state.arms[i], comparitorComplex);
 
 			state.ms_cnts[i] = 0;
-			for (int c = start; c < end; c++) {
-				chainLen *mol = list + state.arms[i]*c;
+			for (pcount c = start; c < end; c++) {
+				chainLen *mol = list + state.arms[i] * c;
 				state.ms_cnts[i]++;
 				adjustMolCnt_order1(i, mol, state.arms[i], 1);
 			}
 			
 			IFVERBOSE {
 				printf("lengths of %s in packet: ",name(i));
-				for (int t = 0; t < maxChainLens[pos] * state.arms[i]; t++) {
+				for (size_t t = 0; t < maxChainLens[pos] * state.arms[i]; t++) {
 					IFVERBOSELONG printf(" %d\n", list[t]);
 				}
 				printf("\n");
@@ -2578,7 +2578,7 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
                Note: this may no longer be possible now that nodes first agree on an adequate MWD tree size
                Redundant code?
              */
-			unsigned common = min_value(maxChainLens_in[pos],maxChainLens_inout[pos]);
+			unsigned common = (unsigned)min_value(maxChainLens_in[pos],maxChainLens_inout[pos]);
 			checkMWDs(mwd_in, common, "mwd_in");
 			checkMWDs(mwd_inout, common, "mwd_inout");
 			dvecAdd(mwd_pos, mwd_in, mwd_inout, common);
@@ -2664,7 +2664,7 @@ int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype 
 	unsigned long long rtime = readTimer(&t);
 	total_rtime += rtime;
 	
-    RANK printf("Reduce time (us) = %I64d for %zu bytes\n", rtime, stateCommSize);
+    RANK printf("Reduce time (us) = %llu for %zu bytes\n", rtime, stateCommSize);
 	lastReduceTime = rtime;
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("    MPI reduction (stirring) complete");
@@ -2690,8 +2690,8 @@ void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
 	}
 
 	// Write to the file
-	int r1 = fwrite(*inStatePacket, stateCommSize, 1, dump);
-	printf("wrote %d elements out of %d requested\n", r1, stateCommSize);
+	size_t r1 = fwrite(*inStatePacket, stateCommSize, 1, dump);
+	printf("wrote %zu elements out of %d requested\n", r1, stateCommSize);
 
 	//Close the file
 	fclose(dump);

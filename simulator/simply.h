@@ -135,7 +135,7 @@ typedef struct {
 
 	TimesVals 		timeCalcData;
 	TimesVals		sysScaleData;
-	float			scaleFactor;
+	double			scaleFactor;
 
 	react_prob		reactProbTree[2*REACT_PROB_TREE_LEAVES-1]; // was prob
 
