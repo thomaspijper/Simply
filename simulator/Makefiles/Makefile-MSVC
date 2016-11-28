@@ -1,6 +1,6 @@
-
 # Paths which the compiler and linker need to know
 # Modify if required (not necessary when Visual Studio and MS-MPI were installed to their default paths)
+# The last two lines assume that you're trying to build a 64-bit program on a 64-bit system (which should be common)
 MPI = "C:\Program Files (x86)\Microsoft SDKs\MPI\Include"
 MPI_x64 = "C:\Program Files (x86)\Microsoft SDKs\MPI\Include\x64"
 MPIlib = "C:\Program Files (x86)\Microsoft SDKs\MPI\Lib\x64\msmpi.lib"
@@ -8,8 +8,8 @@ CC = "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\cl.exe"
 LINK = "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\link.exe"
 
 
-CFLAGS = /c /EHsc /Fo /fp:precise /Gd /GS- /I $(MPI) /I $(MPI_x64) /MT /nologo /Ox /W2 /WX- /Zc:inline
-LFLAGS= /OUT:"simply.exe" /INCREMENTAL:NO /NOLOGO KERNEL32.LIB USER32.LIB GDI32.LIB WINSPOOL.LIB COMDLG32.LIB ADVAPI32.LIB SHELL32.LIB OLE32.LIB OLEAUT32.LIB UUID.LIB ODBC32.LIB ODBCCP32.LIB $(MPIlib) /MACHINE:X64
+CFLAGS = /c /I $(MPI) /I $(MPI_x64) /Zi /nologo /W1 /WX- /O2 /Oi /Ot /Oy /Gm- /EHsc /MT /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo /Gd
+LFLAGS= /OUT:"simply.exe" /INCREMENTAL:NO /NOLOGO $(MPIlib) /MANIFEST:EMBED /DEBUG /PDB:"simply.PDB" /IMPLIB:"simply.LIB" /MACHINE:X64
 
 all: argparse.obj dSFMT.obj simply.obj simply.exe
 
@@ -27,3 +27,4 @@ simply.exe:
 
 clean:
   del *.obj *.exe *.csv *.idb *.pdb
+

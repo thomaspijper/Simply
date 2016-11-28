@@ -57,14 +57,14 @@
 
 // Miscellaneous headers
 #if defined(__GNUC__)
-  #include <unistd.h>	// POSIX headers, getpid()
+  #include <unistd.h>	// POSIX headers, getpid(), gethostname()
   #define _GNU_SOURCE
   #define _BSD_SOURCE
 #elif defined(_MSC_VER)
   #include <process.h>  // _getpid()
   #define getpid _getpid
   #define WIN32_LEAN_AND_MEAN
-  #include <Windows.h>
+  #include <windows.h>
 #endif
 
 // Our own headers
@@ -107,6 +107,7 @@
 #define START_MWD_SIZE 512 // must be a power of 2
 #define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
 #define MAX_FILENAME_LEN 255
+#define MAX_HOSTNAME_LEN 64
 #define MAX_FILE_SIZE 1048576
 
 #define AVOGADRO 6.022140857E23
@@ -138,6 +139,7 @@ int checkPointing = 0;
 static sysState state;
 static char dirname[MAX_FILENAME_LEN] = "\0";
 static char casename[MAX_FILENAME_LEN] = "\0";
+static char hostname[MAX_HOSTNAME_LEN] = "\0";
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
 int myid = -1;
 
@@ -343,6 +345,26 @@ INLINE void getSystemTimeString(char *timeStampString) {
 #endif
 
 // ************* end timer code ********
+
+
+/* Gets the host name of the system */
+void retreiveHostname(void) {
+#if defined(_MSC_VER)
+	unsigned len = MAX_HOSTNAME_LEN - 1;
+	BOOL r = GetComputerName(hostname, &len);
+	if (r == False) {
+		DWORD error = GetLastError();
+		printf("\nFunction %s failed (error value = %d), aborting...", __FUNCTION__, error);
+		exit(EXIT_FAILURE);
+	}
+#elif defined(__GNUC__)
+	int r = gethostname(hostname, MAX_HOSTNAME_LEN - 1);
+	if (r == -1) {
+		int error = errno;
+		printf("\nFunction %s failed (error value = %d), aborting...", __FUNCTION__, error);
+	}
+#endif
+}
 
 /* Parses a string containing a path */
 void parseDirname(char* path) {
@@ -2978,9 +3000,7 @@ int compute(void) {
 }
 
 int main(int argc, char *argv[]) {
-    system("echo \"Starting up on host $HOSTNAME\"");
-
-	MPI_Init(&argc,&argv);
+    MPI_Init(&argc,&argv);
 	MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
 	MPI_Comm_rank(MPI_COMM_WORLD,&myid);
 #if defined(_MSC_VER)
@@ -2988,6 +3008,8 @@ int main(int argc, char *argv[]) {
 #endif
 	startTimer(&state.wallTime);
 
+	retreiveHostname();
+	RANK printf("Starting up on host \"%s\"\n", hostname);
 	RANK printf("\n");
 	RANK printf("Simply version 0.99 beta prerelease\n");
 	RANK printf("Program compiled at %s on %s\n",__TIME__,__DATE__);	
