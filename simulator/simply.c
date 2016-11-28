@@ -224,14 +224,14 @@ INLINE pcount leaveSome(pcount total) {
 
 /* Deals with overflow of array containing mwd tree
  */
-void double_arraysize(pcount **arr, int curr_size) {
-	int newsize = 2 * curr_size;
-	pcount *new_arr = calloc(sizeof(pcount) * (2 * (size_t)newsize - 1), 1);
+void double_arraysize(pcount **arr, size_t curr_size) {
+	size_t newsize = 2 * curr_size;
+	pcount *new_arr = calloc(sizeof(pcount) * (2 * newsize - 1), 1);
 	pcount *old_arr = *arr;
 
-	int p      = 1;  /* size of current level */
-	int src_ix = 0;  /* src index             */
-	int tgt_ix = 1;  /* target index          */
+	size_t p      = 1;  /* size of current level */
+	size_t src_ix = 0;  /* src index             */
+	size_t tgt_ix = 1;  /* target index          */
 
 	new_arr[0] = old_arr[0];
 	while (p < newsize) {
@@ -253,7 +253,7 @@ void strAppend(char *s1, const char *s2) {
 		printf("\nError: concatenation of the strings \n\n    \"%s\"\n\nand\n\n    \"%s\"\n\nwould result in a string length that exceeds the maximum permitted length of %d characters. Aborting...\n", s1, s2, MAX_FILENAME_LEN);
 		exit(EXIT_FAILURE);
 	}
-	int count = (int)min_value(len2, MAX_FILENAME_LEN - len1 - 1);
+	size_t count = (size_t)min_value(len2, MAX_FILENAME_LEN - len1 - 1);
 
 	// Concatenate the strings in a safe way
 #if defined(_MSC_VER)
@@ -342,7 +342,7 @@ void retreiveHostname(void) {
 	BOOL r = GetComputerName(hostname, &len);
 	if (r == False) {
 		DWORD error = GetLastError();
-		printf("\nFunction %s failed (error value = %d), aborting...", __FUNCTION__, error);
+		printf("\nFunction %s failed (error value = %u), aborting...", __FUNCTION__, error);
 		exit(EXIT_FAILURE);
 	}
 #elif defined(__GNUC__)
@@ -431,18 +431,16 @@ void dumpAllTrees() {
 }
 
 INLINE void adjustTree(int spec_ind, mwdStore  *mwd, int leave_ind, int diff) {
-
-	int ind;
-	int levelSize = 1;
-
 	while (leave_ind >= mwd->maxEntries) {
 		printf("tree data structure overflow: %s leaveIx = %d maxEntries = %d\n", name(spec_ind),leave_ind, mwd->maxEntries);
-		double_arraysize(&(mwd->mwd_tree), mwd->maxEntries);
+		double_arraysize(&(mwd->mwd_tree), (size_t)mwd->maxEntries);
 		mwd->maxEntries *= 2;
 	}
 
+	int ind;
+	int levelSize = 1;
 	while (levelSize <= mwd->maxEntries) {
-		ind = (levelSize - 1) + (levelSize*leave_ind)/mwd->maxEntries;
+		ind = (levelSize - 1) + (levelSize * leave_ind) / mwd->maxEntries;
 		mwd->mwd_tree[ind] += diff;
 		levelSize *= 2;
 	}
@@ -540,8 +538,8 @@ void decompressState(void) {
 		else if (i >= MAXSIMPLE) { // poly species
 			int pos = 0;
 			chainLen offset = state.mwds[i][0].maxEntries;
-			for (chainLen len=1; len<=offset; len++) {
-				while (state.mwds[i][0].mwd_tree[offset-1+len] > 0) {
+			for (chainLen len = 1; len <= offset; len++) {
+				while (state.mwds[i][0].mwd_tree[offset - 1 + len] > 0) {
 					state.expMols[i].mols[pos++] = len;
 				}
 			}
@@ -1209,7 +1207,7 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 		/* Poly species: pick one chain lengths according to MWD */
 		*arms = 1;
 		pcount *mwd_tree = state.mwds[spec_index][0].mwd_tree;
-		int size         = state.mwds[spec_index][0].maxEntries;
+		int size = state.mwds[spec_index][0].maxEntries;
 		lens[0] = pickRndChainLen(mwd_tree,size);
 #if DEBUGLEVEL >= 2
 		if (lens[0] < 0) {
@@ -1227,8 +1225,8 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 		*arms = state.arms[spec_index];
 		for (int a=0; a<*arms; a++) {
 			pcount *mwd_tree = state.mwds[spec_index][a].mwd_tree;
-			int size         = state.mwds[spec_index][a].maxEntries;
-			lens[a] = pickRndChainLen(mwd_tree,size);
+			int size = state.mwds[spec_index][a].maxEntries;
+			lens[a] = pickRndChainLen(mwd_tree, size);
 #if DEBUGLEVEL >= 2
 			if (lens[a] < 0) {
 				printf("error: chain length < 0 for species %s(arm=%d)\n", name(spec_index), a);
@@ -1314,12 +1312,12 @@ void scaleSystem(double factor) {
 
 		for (int a = 0; a < state.arms[i]; a++) {
 			int j;
-			for (j = 0; j < state.mwds[i][a].maxEntries-1; j++) {
+			for (j = 0; j < state.mwds[i][a].maxEntries - 1; j++) {
 				state.mwds[i][a].mwd_tree[j] = (pcount)((double)state.mwds[i][a].mwd_tree[j] * factor);
 			}
 
 			pcount total = 0;
-			for (j = state.mwds[i][a].maxEntries-1; j < state.mwds[i][a].maxEntries*2-1; j++) {
+			for (j = state.mwds[i][a].maxEntries - 1; j < state.mwds[i][a].maxEntries * 2 - 1; j++) {
 				state.mwds[i][a].mwd_tree[j] = (pcount)((double)state.mwds[i][a].mwd_tree[j] * factor);
 				total += state.mwds[i][a].mwd_tree[j];
 			}
@@ -1576,7 +1574,7 @@ void react(void) {
 		state.events++;
 	}
 
-	while (((state.time < ((ptime)state.nextSynchTime)/1000) || (state.synchTime == 0)) 
+	while (((state.time < ((ptime)state.nextSynchTime) / 1000) || (state.synchTime == 0)) 
 		  &&
 		  ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
 
@@ -1588,24 +1586,23 @@ void react(void) {
 
 // Prints the mwds and molecule counts
  void print_state() {
-    int i, j, offset;
 	printf("\n\n");
-    for (i = 0; i < NO_OF_MOLSPECS; i++) {
+    for (int i = 0; i < NO_OF_MOLSPECS; i++) {
         if (state.ms_cnts[i] > 0) {
             printf("Species %s (%llu): ", name(i), state.ms_cnts[i]);
             if (i < MAXSIMPLE) {
                 printf("%llu\n", state.ms_cnts[i]);
             } else {
 				pcount cnts[MAX_ARMS];
-				offset = state.mwds[i][0].maxEntries;
-				for (j = 0; j < offset; j++) {
+				int offset = state.mwds[i][0].maxEntries;
+				for (int j = 0; j < offset; j++) {
 					pcount total = 0;
-					for (int a=0; a<state.arms[i]; a++) {
+					for (int a = 0; a<state.arms[i]; a++) {
 						cnts[a] = getMolCnt(i, a, j);
 						total += cnts[a];
 					}
 					if (total > 0) {
-						printf("%d",j+1);
+						printf("%d", j + 1);
 						for (int a=0; a<state.arms[i]; a++) {
 							printf("\t%llu", cnts[a]);
 						}
@@ -1936,31 +1933,6 @@ size_t communicateMaxChainLens(int mode, unsigned *maxChainLens) {
 #endif
 }
 
-
-void print_state_conc(void) {
-	int i, j, offset, length;
-
-	printf ("System state:\n\ttime: %f node volume = %E L\n", state.time, state.volume);
-
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
-		if (state.ms_cnts[i] > 0) {
-			printf (" %s %llu = (%.0f umol/L):\n", name(i), state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
-			if (i < MAXSIMPLE) {
-				printf ("\t %llu = %.0f umol/L\n", state.ms_cnts[i], 1e6*toConc(state.ms_cnts[i]));
-			} else {
-				offset = state.mwds[i][0].maxEntries - 1;
-				length = 1;
-				for (j = offset; j < 2*offset+1; j++) {
-					if (state.mwds[i][0].mwd_tree[j] > 0) {
-						printf ("%d\t%llu = %.0f umol/L \n", length, state.mwds[i][0].mwd_tree[j], 1e6*toConc(state.mwds[i][0].mwd_tree[j]));
-					}
-					length++;
-				}
-			}
-		}
-	}
-}
-
 void print_kinetic_model(void) {
 	printf("\tname\ttype\n");
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
@@ -2269,7 +2241,7 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 			}
 #else
 			for (int a = 0; a < state.arms[i]; a++) {
-				pcount *leaves = state.mwds[i][a].mwd_tree+state.mwds[i][a].maxEntries-1;
+				pcount *leaves = state.mwds[i][a].mwd_tree + state.mwds[i][a].maxEntries - 1;
 				memcpy(packetMwds, leaves, maxChainLens[pos] * sizeof(pcount));
 				packetMwds += maxChainLens[pos];
 				pos++;
