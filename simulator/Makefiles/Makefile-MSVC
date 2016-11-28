@@ -1,6 +1,5 @@
 # Paths which the compiler and linker need to know
 # Modify if required (not necessary when Visual Studio and MS-MPI were installed to their default paths)
-# The last two lines assume that you're trying to build a 64-bit program on a 64-bit system (which should be common)
 MPI = "C:\Program Files (x86)\Microsoft SDKs\MPI\Include"
 MPI_x64 = "C:\Program Files (x86)\Microsoft SDKs\MPI\Include\x64"
 MPIlib = "C:\Program Files (x86)\Microsoft SDKs\MPI\Lib\x64\msmpi.lib"
