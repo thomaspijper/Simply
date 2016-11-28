@@ -23,9 +23,9 @@
 
  // Define inline directive for MSVC and GCC
 #if defined(_MSC_VER)
-#define INLINE __inline
+  #define INLINE __inline
 #elif defined(__GNUC__)
-#define INLINE inline
+  #define INLINE inline
 #endif
 
 #define MAX_DATA_FILE 1000
@@ -155,8 +155,9 @@ typedef struct {
 } StatePacket;
 
 
-void print_state();
-
+void print_state(void);
 INLINE const char *name(int index);
 INLINE const char *rname(int index);
 void print_reaction(int reaction_index);
+void print_kinetic_model(void);
+void monomerAudit(const char *str);

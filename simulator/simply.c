@@ -37,7 +37,7 @@
     #define _POSIX_C_SOURCE 200112L
   #endif
 #endif
- 
+
 // Headers usable under both Windows and Linux
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,14 +74,19 @@
 #include "genpolymer.h"
 #include "simply.h"
 
+// Controls how chains lengths are handled
 #define EXPLICIT_SYSTEM_STATE
 
-#define RANK if (myid == 0)
+// Controls random number generation
+//#define CHANGE_SEED
 
-// Control of random number generation
-//#define CHANGE_SEED 1
+/* The number of PRNs to generate at a time.
+Should not be smaller than 382 and must be an even number.
+Changing this value will lead to different PRNs being generated. */
+#define PRNG_ARRAY_SIZE 1000
 
-//#define SCALING 1
+// Controls scaling
+//#define SCALING
 
 // Verbose options
 #define VERBOSE 1
@@ -92,11 +97,11 @@
 
 // Debugging functions
 #define DEBUGLEVEL 0
-//#define TRACE 1
-//#define NO_COMM 1
+//#define TRACE
+//#define NO_COMM
 #define MONO_AUDIT
 
-// Aliases used for printing state infor to files
+// Aliases used for printing state info to files
 #define START 0
 #define PROFILES 1
 
@@ -104,49 +109,32 @@
 #define PRESTIRR 0
 #define POSTSTIRR 1
 
-#define START_MWD_SIZE 512 // must be a power of 2
-#define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
-#define MAX_FILENAME_LEN 255
-#define MAX_HOSTNAME_LEN 64
-#define MAX_FILE_SIZE 1048576
-
-#define AVOGADRO 6.022140857E23
-
-/* Number of PRNs to generate at a time.
-   Should not be smaller than 382 and must be an even number.
-   Changing this value will lead to different PRNs being generated. */
-#define PRNG_ARRAY_SIZE 1000
-
 // Messages for setting up data at start
 #define SETUP_END 0
 #define SETUP_CONVDATA 1
 #define SETUP_SYSTEMSCALES 2
 
-// Define inline directive for MSVC and GCC
-#if defined(_MSC_VER)
-  #define INLINE __inline
-#elif defined(__GNUC__)
-  #define INLINE inline
-#endif
+// Miscellaneous defines
+#define START_MWD_SIZE 512 // must be a power of 2
+#define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
+#define MAX_FILENAME_LEN 255
+#define MAX_HOSTNAME_LEN 64
+#define MAX_FILE_SIZE 1048576
+#define AVOGADRO 6.022140857E23
+#define RANK if (myid == 0)
 
-enum bools {False=0,True=1};
-
+// Initialize variables
+enum bools {False = 0,True = 1};
 int numprocs = -1;
-unsigned long long lastReduceTime = 0;
 int currentComparisonComplexity = -1;
-int mwdsMerged = 1;
-int checkPointing = 0;
+int mwdsNodesMerged = 1;
 static sysState state;
 static char dirname[MAX_FILENAME_LEN] = "\0";
 static char casename[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
-unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0;
+unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0, lastReduceTime = 0;
 int myid = -1;
 
-void print_kinetic_model(void);
-void monomerAudit(const char *str);
-void print_state(void);
-       
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
 }
@@ -588,7 +576,7 @@ void mergeMWDs(void) {
 			free(mwd_tree_combined);
 		}
 	}
-	mwdsMerged = numprocs;
+	mwdsNodesMerged = numprocs;
 }
 
 /* For O(1) algorithm, uses large amounts of memory */
@@ -867,7 +855,7 @@ void file_write_MWDs(void) {
 			int length = 1;
 			for (int j = offset; j < 2 * offset + 1; j++) {
 				if (state.mwds[i][0].mwd_tree[j] > 0) {
-					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], (1e6*toConc(state.mwds[i][0].mwd_tree[j])/mwdsMerged));
+					fprintf(dist, "%d;%llu;%e\n", length, state.mwds[i][0].mwd_tree[j], (1e6 * toConc(state.mwds[i][0].mwd_tree[j]) / mwdsNodesMerged));
 				}
 				length++;
 			}
@@ -2952,7 +2940,7 @@ int compute(void) {
 		// generate new seed
 		unsigned nextSeed = (unsigned)(lastReduceTime + getpid());
 		dsfmt_gv_init_gen_rand(nextSeed);
-//		printf("new random seed is %u\n",nextSeed);
+		printf("New random seed is %u\n", nextSeed);
 #endif
 
 		// Recalculate what's needed
