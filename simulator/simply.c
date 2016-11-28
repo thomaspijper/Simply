@@ -130,7 +130,7 @@ int currentComparisonComplexity = -1;
 int mwdsNodesMerged = 1;
 static sysState state;
 static char dirname[MAX_FILENAME_LEN] = "\0";
-static char casename[MAX_FILENAME_LEN] = "\0";
+static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
 unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0, lastReduceTime = 0;
 int myid = -1;
@@ -682,7 +682,7 @@ void file_write_state(int mode) {
 	// Initialize writing of concentrations
 	char concfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(concfname, dirname);
-	strAppend(concfname, casename);
+	strAppend(concfname, simname);
 	strAppend(concfname, "concentrations");
 	strAppend(concfname, ".csv");
 	FILE *conc;
@@ -691,7 +691,7 @@ void file_write_state(int mode) {
 	// Initialize writing of rates
 	char ratesfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(ratesfname, dirname);
-	strAppend(ratesfname, casename);
+	strAppend(ratesfname, simname);
 	strAppend(ratesfname, "rates");
 	strAppend(ratesfname, ".csv");
 	FILE *rates;
@@ -700,7 +700,7 @@ void file_write_state(int mode) {
 	// Initialize writing of rate coefficients
 	char ratecoeffsfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(ratecoeffsfname, dirname);
-	strAppend(ratecoeffsfname, casename);
+	strAppend(ratecoeffsfname, simname);
 	strAppend(ratecoeffsfname, "ratecoeffs");
 	strAppend(ratecoeffsfname, ".csv");
 	FILE *ratecoeffs;
@@ -709,7 +709,7 @@ void file_write_state(int mode) {
 	// Initialize writing of reaction events
 	char eventsfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(eventsfname, dirname);
-	strAppend(eventsfname, casename);
+	strAppend(eventsfname, simname);
 	strAppend(eventsfname, "reactionevents");
 	strAppend(eventsfname, ".csv");
 	FILE *events;
@@ -842,7 +842,7 @@ void file_write_MWDs(void) {
 		if ((i >= MAXSIMPLE) && (i < MAXPOLY)) {
 			char distfname[MAX_FILENAME_LEN] = "\0";
 			strAppend(distfname, dirname);
-			strAppend(distfname, casename);
+			strAppend(distfname, simname);
 			strAppend(distfname, name(i));
 			strAppend(distfname, "-");
 			strAppend(distfname, timeStr);
@@ -871,7 +871,7 @@ void file_write_debug(const char *str) {
 	// Initialize writing of logfile
 	char logfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(logfname, dirname);
-	strAppend(logfname, casename);
+	strAppend(logfname, simname);
 	strAppend(logfname, "logfile");
 	strAppend(logfname, ".txt");
 	FILE *log;
@@ -2678,7 +2678,7 @@ void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
 	// Open the file
 	char fname[MAX_FILENAME_LEN] = "\0";
 	strAppend(fname, dirname);
-	strAppend(fname, casename);
+	strAppend(fname, simname);
 	strAppend(fname, "stateDump");
 	FILE *dump;
 	fileOpen(&dump, fname, "w");
@@ -2778,7 +2778,7 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 	unsigned arg_synchevents = UINT_MAX;
 	unsigned arg_synchtime = UINT_MAX;
 	char *arg_dirname = NULL;
-	char *arg_casename = NULL;
+	char *arg_simname = NULL;
 	struct argparse_option options[] = {
 		OPT_HELP(),
 		OPT_GROUP("Basic options"),
@@ -2786,7 +2786,7 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 		OPT_UINT('e', "events", &arg_synchevents, "number of events between each two synchronizations (allowed range: 0 - 4294967294)"),
 		OPT_UINT('t', "simtime", &arg_synchtime, "simulation time (ms) between each two synchronizations (allowed range: 0 - 4294967294)"),
 		OPT_STRING('o', "output", &arg_dirname, "output directory"),
-		OPT_STRING('n', "casename", &arg_casename, "name of the case (used as a prefix for filenames of output files"),
+		OPT_STRING('n', "simname", &arg_simname, "name of the case (used as a prefix for filenames of output files"),
 		OPT_END(),
 	};
 	struct argparse argparse;
@@ -2819,10 +2819,10 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 		strAppend(dirname, arg_dirname);
 		printf("User defined output path: %s\n", dirname);
 	}
-	if (arg_casename != NULL) {
-		strAppend(casename, arg_casename);
-		printf("User defined filename prefix: %s\n", casename);
-		strAppend(casename, "-");
+	if (arg_simname != NULL) {
+		strAppend(simname, arg_simname);
+		printf("User defined filename prefix: %s\n", simname);
+		strAppend(simname, "-");
 	}
 
 	// Check if at least one sync interval is nonzero -- to be used in the future
