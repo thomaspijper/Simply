@@ -19,8 +19,8 @@
 
 // Block compilers that do not identify as GCC or MSVC
 #if defined(__GNUC__)
-  #if __GNUC__ < 5
-    #error GCC versions older than 5.x are not supported.
+  #if __GNUC__ < 5 || (__GNUC__ == 4 && __GNUC_MINOR__ < 3)
+    #error GCC versions older than 4.3.x are not supported.
   #endif
 #elif defined(_MSC_VER)
   #if _MSC_VER < 1900
