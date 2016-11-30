@@ -335,9 +335,8 @@ class writeOutput(object):
     def MONOMERAUDIT(self, file, generalDict):
     # Indicate whether or not a monomer audit should be performed at each synchronization
 
-        if generalDict['monomeraudit'] == 1:
-            line = '#define MONO_AUDIT\n'
-            self.writeSingleString(file, line)
+        line = '#define MONO_AUDIT {0}\n'.format(generalDict['monomeraudit'])
+        self.writeSingleString(file, line)
         return True
   
 

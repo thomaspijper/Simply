@@ -122,17 +122,18 @@ Changing this value will lead to different PRNs being generated. */
 #define AVOGADRO 6.022140857E23
 #define RANK if (myid == 0)
 
-// Initialize variables
+// Initialize various variables
 enum bools {False = 0,True = 1};
+int myid = -1;
 int numprocs = -1;
 int currentComparisonComplexity = -1;
 int mwdsNodesMerged = 1;
+unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0, lastReduceTime = 0;
 static sysState state;
 static char dirname[MAX_FILENAME_LEN] = "\0";
 static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
-unsigned long long total_wtime = 0, total_rtime = 0, reduces = 0, lastReduceTime = 0;
-int myid = -1;
+static const _Bool monomeraudit = MONO_AUDIT;
 
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
@@ -2000,6 +2001,9 @@ pcount getConvertedMonomer() {
 }
 
 void monomerAuditLocal(const char *str) {
+	if (!monomeraudit) {
+		return; // Do not perform
+	}
 
     pcount discrepancy = state.currentMonomerMolecules
 					   + getConvertedMonomer()
@@ -2017,7 +2021,6 @@ void monomerAuditLocal(const char *str) {
 				auditFailFlag = 1;
 			}
 		}
-
 		if (auditFailFlag == 0) {
 			printf("Local monomer audit (%s) passed on all nodes\n", str);
 		}
@@ -2437,21 +2440,22 @@ void commToState(StatePacket **inStatePacket) {
 
 	REACTION_PROBABILITY_TREE_INIT
 	
-#ifdef MONO_AUDIT
 	// Global monomer audit
-	RANK { 
-		if ((*inStatePacket)->globalAllMonomer != GLOBAL_MONOMER_PARTICLES) {
-			printf("\nGlobal monomer audit has failed! Discrepancy = %llu\n\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
+	if (monomeraudit) {
+		RANK { 
+			if ((*inStatePacket)->globalAllMonomer != GLOBAL_MONOMER_PARTICLES) {
+				printf("\nGlobal monomer audit has failed! Discrepancy = %llu\n\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
+			}
+			else {
+				printf("Global monomer audit passed.\n");
+			}
 		}
-		else {
-			printf("Global monomer audit passed.\n");
-		}
+		// setup data for local monomer audits during the next simulation phase
+		state.currentMonomerMolecules = monomerCount();
+		state.initialMonomerMolecules = state.currentMonomerMolecules + getConvertedMonomer();
+		IFVERBOSELONG printf("imm = %lld\n",state.initialMonomerMolecules);
 	}
-	// setup data for local monomer audits during the next simulation phase
-	state.currentMonomerMolecules = monomerCount();
-	state.initialMonomerMolecules = state.currentMonomerMolecules + getConvertedMonomer();
-	IFVERBOSELONG printf("imm = %lld\n",state.initialMonomerMolecules);
-#endif
+
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("    commToState() has finished");
 #endif
@@ -2827,13 +2831,12 @@ int compute(void) {
    In addition, always stop when the maximum
    walltime has been exceeeded or no more reactions
    are possible on one or more nodes */
-	while (((state.time < MAX_SIM_TIME)
-		|| (state.events < MAX_EVENTS) 
-		|| (state.conversion < MAX_CONVERSION))
+	while (((state.time       < MAX_SIM_TIME  )
+		||  (state.events     < MAX_EVENTS    ) 
+		||  (state.conversion < MAX_CONVERSION))
 		&& (readTimerSec(&state.wallTime) < MAX_WALL_TIME * 60)
 		&& (state.noMoreReactions == 0))
 	{
-
 		Timer work;
 		startTimer(&work);
 		rcount prev_events = state.events;
@@ -2846,9 +2849,7 @@ int compute(void) {
 		state.currentMonomerMolecules = monomerCount();
 		state.conversion = conversion();
 
-#ifdef MONO_AUDIT
 		monomerAuditLocal("post reactions");
-#endif
 
 		RANK printf("Work time (us) on node %d = %llu\n", myid, wtime);
 		RANK printf("Total number of events on node %d = %llu\n", myid, state.events);
@@ -2901,10 +2902,7 @@ int compute(void) {
 #if DEBUGLEVEL >= 1
 		RANK file_write_debug("  Synchronization complete");
 #endif
-#ifdef MONO_AUDIT
 		monomerAuditLocal("post communicate");
-#endif
-
 #endif
 	
 #ifdef CHANGE_SEED
