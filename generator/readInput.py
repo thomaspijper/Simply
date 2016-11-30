@@ -367,14 +367,20 @@ class readInput(object):
                 self.lineError(linecache.getline(file, i),'Invalid reaction structure')
                 return -1
 
+            # Check if the reaction name is unique
+            for j in range(len(reactions)):
+                if line[0] == reactions[j][0]:
+                    self.lineError(linecache.getline(file, i),'Reaction name has already been specified')
+                    return -1
+
             # Check whether the rate coefficient is known
             for j in range(len(ratesList)):
                 if line[1] == ratesList[j][0]:
                     break
                 elif j == (len(ratesList) - 1):
                     self.lineError(linecache.getline(file, i),'Unknown rate coefficient')
-                    return -1
-            
+                    return -1            
+
             # Parse interconversions
             if len(line) == 6:
 
