@@ -43,10 +43,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <time.h>
 #include <assert.h>
 #include <limits.h>
-#include <float.h>
 
 // MPI header
 #if defined(__GNUC__)
@@ -58,6 +56,7 @@
 // Miscellaneous headers
 #if defined(__GNUC__)
   #include <unistd.h>	// POSIX headers, getpid(), gethostname()
+  #include <sys/time.h> // gettimeofday()
   #define _GNU_SOURCE
   #define _BSD_SOURCE
 #elif defined(_MSC_VER)
@@ -218,7 +217,7 @@ INLINE pcount leaveSome(pcount total) {
 	pcount rough = total/numprocs;
 	pcount leftovers = total % (pcount)numprocs;
 	pcount correction = (myid >= leftovers) ? leftovers : myid;
-	pcount ans = myid*rough + correction;
+	pcount ans = myid * rough + correction;
 	return ans;
 }
 
@@ -307,9 +306,8 @@ double readTimerSec(Timer *t) {
 }
 
 /* Get the current time (currently used for debugging only) */
-#if DEBUGLEVEL >= 1
 INLINE void getSystemTimeString(char *timeStampString) {
-  #if defined(__GNUC__)
+#if defined(__GNUC__)
 	timeval fileTime;
 	tm systemTime;
 
@@ -319,7 +317,7 @@ INLINE void getSystemTimeString(char *timeStampString) {
 	snprintf(timeStampString, 27, "[%04d-%02d-%02d %02d:%02d:%02d:%03ld] ", systemTime.tm_year, systemTime.tm_mon, systemTime.tm_mday,
 																		    systemTime.tm_hour, systemTime.tm_min, systemTime.tm_sec,
 																		    ms);
-  #elif defined(_MSC_VER)
+#elif defined(_MSC_VER)
 	FILETIME fileTime;
 	SYSTEMTIME systemTime;
 
@@ -328,9 +326,8 @@ INLINE void getSystemTimeString(char *timeStampString) {
 	snprintf(timeStampString, 27, "[%04d-%02d-%02d %02d:%02d:%02d:%03d] ", systemTime.wYear, systemTime.wMonth, systemTime.wDay,
 		                                                                   systemTime.wHour, systemTime.wMinute, systemTime.wSecond,
 		                                                                   systemTime.wMilliseconds);
-}
-  #endif
 #endif
+}
 
 // ************* end timer code ********
 
@@ -519,8 +516,7 @@ void compressState(void) {
 void decompressState(void) {
 	printf("decompressStateRunning... ");
 	for (int i=0; i < NO_OF_MOLSPECS; i++) {
-		memset(state.expMols[i].mols, 0, sizeof(chainLen)*state.expMols[i].maxMolecules*state.arms[i]);
-//		pcount oldMsCnts = state.ms_cnts[i];
+		memset(state.expMols[i].mols, 0, sizeof(chainLen) * state.expMols[i].maxMolecules * state.arms[i]);
 		if (i >= MAXPOLY) { // complex species
 
 			break;
@@ -659,13 +655,13 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
 #if defined(_MSC_VER)
 	int r = fopen_s(stream, filename, mode);
 	if (r != 0) {
-		printf("Could not open file %s\nError code produced by fopen_s is %d\n", filename, r);
+		RANK printf("Could not open file %s\nError code produced by fopen_s is %d\n", filename, r);
 		exit(EXIT_FAILURE);
 	}
 #elif defined(__GNUC__)
 	*stream = fopen(filename, mode);
 	if (*stream == NULL) {
-		printf("Could not open file %s\n", filename);
+		RANK printf("Could not open file %s\n", filename);
 		exit(EXIT_FAILURE);
 	}
 #endif
@@ -674,8 +670,6 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
 /* Writes state information to files
 */
 void file_write_state(int mode) {
-	char timeStr[MAX_FILENAME_LEN];
-	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)round(state.time));
 
 	// Initialize writing of concentrations
 	char concfname[MAX_FILENAME_LEN] = "\0";
@@ -906,9 +900,9 @@ inline int pickRndReaction() __attribute__((always_inline));
 #endif
 
 INLINE int pickRndReaction() {
-    react_prob	rate;
+    probability	rate;
     int			i;
-    react_prob	rnd, origRnd;
+    probability	rnd, origRnd;
 	static int	prevReact;
 
 	// Choose reaction based on probability
@@ -920,7 +914,7 @@ INLINE int pickRndReaction() {
 	origRnd = rnd;
 
 	int curr = 1;
-	react_prob curr_prob;
+	probability curr_prob;
   	while (curr < REACT_PROB_TREE_LEAVES) {
 		curr = curr << 1;
 		curr_prob = state.reactProbTree[curr - 1];
@@ -963,115 +957,16 @@ INLINE int pickRndReaction() {
     return i;
 }
 
-/* Reads pairs of numbers from data file in format "%f %f" and stores them
- * in struct p.
- */
-/*void readDataFile(const char *fname, TimesVals *p) {
-	FILE *f;
-	fileOpen(&f, fname, "r");
-
-	p->ix = 0;
-	p->maxIx = 0;
-
-	float time,value;
-	while (fscanf(f,"%f %f\n", &time, &value) != EOF 
-			&& p->maxIx < MAX_DATA_FILE)
-	{
-		p->ts[p->maxIx] = time;
-		p->xs[p->maxIx++] = value;
-	}
-
-	if (p->maxIx >= MAX_DATA_FILE) {
-		printf("Increase MAX_DATA_FILE\n");
-		exit(EXIT_FAILURE);
-	}
-	fclose(f);
-
-	printf("%s: %d (time,x) pairs read from file %s\n",__FUNCTION__,p->maxIx,fname);
-
-}*/
-
-INLINE int MPI_Recv_int_wrap() {
-	int i;
-	const int howmany = 1;
-	MPI_Bcast(&i, howmany, MPI_INT, 0, MPI_COMM_WORLD);
-	return i;
-}
-
-void setupParallelData() {
-	if (myid == 0) {
-		int msg;
-		// send SETUP_CONVDATA
-		msg = SETUP_CONVDATA;
-		MPI_Bcast (&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		msg = state.timeCalcData.maxIx;
-		MPI_Bcast (&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast (state.timeCalcData.ts, state.timeCalcData.maxIx, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast (state.timeCalcData.xs, state.timeCalcData.maxIx, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		printf("Master: broadcasted moments data\n");
-
-		// send SETUP_SYSTEMSCALES
-#ifdef SCALING
-		msg = SETUP_SYSTEMSCALES;
-		MPI_Bcast (&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-		msg = state.sysScaleData.maxIx;
-		MPI_Bcast (&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
-		MPI_Bcast (state.sysScaleData.ts, state.sysScaleData.maxIx, MPI_FLOAT, 0, MPI_COMM_WORLD);
-		MPI_Bcast (state.sysScaleData.xs, state.sysScaleData.maxIx, MPI_FLOAT, 0, MPI_COMM_WORLD);
-#endif
-		
-		// Send SETUP_END
-		msg = SETUP_END;
-		MPI_Bcast (&msg, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	}
-	else {
-		//printf("Slave receiving...\n");
-		for(int task = MPI_Recv_int_wrap(); task != SETUP_END; task = MPI_Recv_int_wrap()) {
-			if (task == SETUP_CONVDATA) {
-				int howmany;
-			    MPI_Bcast(&howmany, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(state.timeCalcData.ts, howmany, MPI_FLOAT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(state.timeCalcData.xs, howmany, MPI_FLOAT, 0, MPI_COMM_WORLD);
-				state.timeCalcData.maxIx = howmany;
-			}
-			else if (task == SETUP_SYSTEMSCALES) {
-				int howmany;
-			    MPI_Bcast(&howmany, 1, MPI_INT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(state.sysScaleData.ts, howmany, MPI_FLOAT, 0, MPI_COMM_WORLD);
-				MPI_Bcast(state.sysScaleData.xs, howmany, MPI_FLOAT, 0, MPI_COMM_WORLD);
-				state.sysScaleData.maxIx = howmany;
-				//printf("%d system scales received from Master\n",state.sysScaleData.maxIx);
-			}
-			else {
-				printf ("\nError on node %d: bad setup task\n\n", myid);
-				exit(EXIT_FAILURE);
-			}
-		}
-	}
-}
-
-/* Initialise the state variable.
- * 
- * From CodeGen polysim.c.
+/* Initialise the simulation
  */
 void initSysState(unsigned seed) {
 #if DEBUGLEVEL >= 1
 	RANK file_write_debug("Start initialization of the simulation");
 #endif
 
-    int i;
-
 	dsfmt_gv_init_gen_rand(seed);
 
-#ifdef SCALING
-	RANK readDataFile("system.scaling",&state.sysScaleData);
-#endif
 	state.scaleFactor = 1.0;
-
-	if (numprocs > 1)
-		setupParallelData();
 
     /* time, rate, particles, events, conversion, temperatures, etc. */
     state.time = 0.0;
@@ -1099,13 +994,13 @@ void initSysState(unsigned seed) {
     /* MWD_INITS initialises those ms_cnts not set to 0. rely on malloc/memset for the rest */
     MWD_INITS
 
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		state.ms_cnts[i] = takeSome(state.ms_cnts[i]);
 	}
 	
     /* initialise mwds */
     /* enter all mols into mwds */
-	for (i = 0; i < NO_OF_MOLSPECS; i++) {
+	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		for (int a = 0; a < MAX_ARMS; a++) {
 	        state.mwds[i][a].maxEntries = START_MWD_SIZE;
 	        state.mwds[i][a].mwd_tree = malloc((2 * START_MWD_SIZE - 1) * sizeof(pcount));
@@ -1115,19 +1010,19 @@ void initSysState(unsigned seed) {
 
 	state.initialMonomerMolecules = monomerCount();
 	state.currentMonomerMolecules = state.initialMonomerMolecules;
-	state.volume = (state.localMonomerParticles/AVOGADRO)/MONOMERCONCENTRATION;
+	state.volume = (state.localMonomerParticles / AVOGADRO) / MONOMERCONCENTRATION;
 
 	REACTIONS_INIT
 
 	int tmp[NO_OF_MOLSPECS] = ARMS_INIT;
-	memcpy(state.arms, tmp, NO_OF_MOLSPECS*sizeof(int));
-	memset(state.reactProbTree, 0, (2*REACT_PROB_TREE_LEAVES-1)*sizeof(probability));
+	memcpy(state.arms, tmp, NO_OF_MOLSPECS * sizeof(int));
+	memset(state.reactProbTree, 0, (2 * REACT_PROB_TREE_LEAVES - 1) * sizeof(probability));
 	REACTION_PROBABILITY_TREE_INIT
 
 	
 #ifdef EXPLICIT_SYSTEM_STATE
-	state.expMols = malloc(sizeof(MoleculeList)*NO_OF_MOLSPECS);
-	for (int i=0; i < NO_OF_MOLSPECS; i++) {
+	state.expMols = malloc(sizeof(MoleculeList) * NO_OF_MOLSPECS);
+	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		size_t initialSize = 10485760;
 		if (i >= MAXSIMPLE) {
 			state.expMols[i].mols = malloc(initialSize * sizeof(chainLen) * (size_t)state.arms[i]);
@@ -1195,7 +1090,6 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 #endif
 
     /* decrement global and spec local count */
-//    state.no_of_mols--;
 	if (state.ms_cnts[spec_index] > 0)
 	    state.ms_cnts[spec_index]--;
 
@@ -1223,7 +1117,7 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
 		/* Complex species: pick several chain lengths according to MWD */
 		*arms = state.arms[spec_index];
-		for (int a=0; a<*arms; a++) {
+		for (int a = 0; a < *arms; a++) {
 			pcount *mwd_tree = state.mwds[spec_index][a].mwd_tree;
 			int size = state.mwds[spec_index][a].maxEntries;
 			lens[a] = pickRndChainLen(mwd_tree, size);
@@ -1333,8 +1227,8 @@ void scaleSystem(double factor) {
 		}
 	}
 
-	state.initialMonomerMolecules = (pcount)((double)state.initialMonomerMolecules * factor);
-	state.currentMonomerMolecules = (pcount)((double)state.currentMonomerMolecules * factor);
+	state.initialMonomerMolecules = (pcount)(state.initialMonomerMolecules * factor);
+	state.currentMonomerMolecules = (pcount)(state.currentMonomerMolecules * factor);
 	state.volume *= factor;
 
 	printf("System scaled by factor of %f\n",factor);

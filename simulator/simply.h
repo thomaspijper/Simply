@@ -29,11 +29,8 @@
 #endif
 
 #define MAX_DATA_FILE 1000
-#define RATES_VEC_SIZE 10
 typedef double probability;
-typedef double react_prob;
 typedef double ptime;
-typedef double rateCoefficient;
 typedef unsigned long long pcount; // stores a number of particles
 typedef unsigned long long rcount; // stores a number of reaction events
 #ifdef LONGCHAINSUPPORT
@@ -45,20 +42,13 @@ typedef short chainLen;
 #endif
 
 typedef struct {
-	rateCoefficient	rc;
-	int				arg_ms1;
-	int				arg_ms2;
-	int				res_ms1;
-	int				res_ms2;    
-	double			energy;
+	double	rc;
+	int		arg_ms1;
+	int		arg_ms2;
+	int		res_ms1;
+	int		res_ms2;    
+	double	energy;
 } reaction;
-
-typedef struct {
-	float	xs[MAX_DATA_FILE];
-	float	ts[MAX_DATA_FILE];
-	int		maxIx;
-	int		ix;
-} TimesVals;
 
 typedef struct {
 	int		maxEntries;   /* max number of entries in leaves */
@@ -128,16 +118,10 @@ typedef struct {
 	pcount 			initialMonomerMolecules;
 	pcount 			currentMonomerMolecules;
 	pcount			localMonomerParticles;
-  
-	probability 	ratesVec[RATES_VEC_SIZE];
-	int 			ratesVecPos;
-	pcount 			tracerInitial;
 
-	TimesVals 		timeCalcData;
-	TimesVals		sysScaleData;
 	double			scaleFactor;
 
-	react_prob		reactProbTree[2*REACT_PROB_TREE_LEAVES-1]; // was prob
+	probability		reactProbTree[2 * REACT_PROB_TREE_LEAVES - 1]; // was prob
 
 	MoleculeList	*expMols;
   
