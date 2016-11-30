@@ -92,7 +92,8 @@ class readInput(object):
         'freevolume':        0,          # Int, not required, default is 0 (= off)
         'recalcconversion':  0,          # Int, not required, default is 0 (= off)
         'longchainsupport':  0,          # Int, not required, default is 0 (= off)
-        'usefactor2':        1           # Int, not required, default is 1 (= on)
+        'usefactor2':        1,          # Int, not required, default is 1 (= on)
+        'monomeraudit':      1           # Int, not required, default is 1 (= on)
         }
         reqLength = [2]
         reqParams = ['particlecount','monomernames','maxwalltime','syncsimtime','syncevents']
@@ -251,9 +252,14 @@ class readInput(object):
             print('\nInvalid value specified for "longchainsupport"')
             return -1
         
-        # Check if 'longchainsupport' has a valid value
+        # Check if 'usefactor2' has a valid value
         if generalDict['usefactor2'] not in [0,1]:
             print('\nInvalid value specified for "usefactor2"')
+            return -1
+
+        # Check if 'monomeraudit' has a valid value
+        if generalDict['monomeraudit'] not in [0,1]:
+            print('\nInvalid value specified for "monomeraudit"')
             return -1
 
         return generalDict

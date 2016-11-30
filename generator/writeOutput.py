@@ -330,7 +330,16 @@ class writeOutput(object):
             line = '#define LONGCHAINSUPPORT\n'
             self.writeSingleString(file, line)
         return True
-        
+
+
+    def MONOMERAUDIT(self, file, generalDict):
+    # Indicate whether or not a monomer audit should be performed at each synchronization
+
+        if generalDict['monomeraudit'] == 1:
+            line = '#define MONO_AUDIT\n'
+            self.writeSingleString(file, line)
+        return True
+  
 
     def REACTION_PROBABILITY_TREE_INIT(self, file, reactionsList, moleculesList):
     # We're going to define the reaction probability tree

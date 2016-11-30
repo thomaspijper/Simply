@@ -167,6 +167,7 @@ def main():
     write.SZYMANSKI(outputfile,generalDict)
     write.freeVolumeParameters(outputfile,generalDict,freeVolumeDict)
     write.LONGCHAINSUPPORT(outputfile,generalDict)
+    write.MONOMERAUDIT(outputfile,generalDict)
     write.TREE_UPDATE_BODY(outputfile,reactionsList,moleculesList)
     write.REACTION_PROBABILITY_TREE_INIT(outputfile,reactionsList,moleculesList)
     write.REACT_PROB_TREE_LEAVES(outputfile,reactionsList)

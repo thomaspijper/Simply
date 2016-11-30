@@ -99,7 +99,6 @@ Changing this value will lead to different PRNs being generated. */
 #define DEBUGLEVEL 0
 //#define TRACE
 //#define NO_COMM
-#define MONO_AUDIT
 
 // Aliases used for printing state info to files
 #define START 0
@@ -2028,7 +2027,7 @@ pcount getConvertedMonomer() {
 	return convertedMonomer;
 }
 
-void monomerAudit(const char *str) {
+void monomerAuditLocal(const char *str) {
 
     pcount discrepancy = state.currentMonomerMolecules
 					   + getConvertedMonomer()
@@ -2042,7 +2041,7 @@ void monomerAudit(const char *str) {
 		int auditFailFlag = 0;
 		for (int i = 0; i < numprocs; i++) {
 			if (workerDiscrepancies[i] != 0) {
-				printf("Local monomer audit (%s) failed on node %d! Discrepancy = %llu\n", str, i, workerDiscrepancies[i]);
+				printf("\nLocal monomer audit (%s) failed on node %d! Discrepancy = %llu\n\n", str, i, workerDiscrepancies[i]);
 				auditFailFlag = 1;
 			}
 		}
@@ -2470,7 +2469,7 @@ void commToState(StatePacket **inStatePacket) {
 	// Global monomer audit
 	RANK { 
 		if ((*inStatePacket)->globalAllMonomer != GLOBAL_MONOMER_PARTICLES) {
-			printf("Global monomer audit has failed! Discrepancy = %llu\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
+			printf("\nGlobal monomer audit has failed! Discrepancy = %llu\n\n", (*inStatePacket)->globalAllMonomer - GLOBAL_MONOMER_PARTICLES);
 		}
 		else {
 			printf("Global monomer audit passed.\n");
@@ -2876,7 +2875,7 @@ int compute(void) {
 		state.conversion = conversion();
 
 #ifdef MONO_AUDIT
-		monomerAudit("post reactions");
+		monomerAuditLocal("post reactions");
 #endif
 
 		RANK printf("Work time (us) on node %d = %llu\n", myid, wtime);
@@ -2931,7 +2930,7 @@ int compute(void) {
 		RANK file_write_debug("  Synchronization complete");
 #endif
 #ifdef MONO_AUDIT
-		monomerAudit("post communicate");
+		monomerAuditLocal("post communicate");
 #endif
 
 #endif
