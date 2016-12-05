@@ -1697,7 +1697,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 
 	size_t maxNameLen = 10; // 9 characters and 1 space
-	size_t nodeIDLen = strlen("Node XYZ ");
+	size_t nodeIDLen = 11; // length unsigned int (10 digits max) and 1 space
 	size_t sum = 0;
 	size_t nodesToPrint = 1;
 	size_t rankLen = 1;
@@ -1752,7 +1752,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
 				// Compare arms lengths for multiarm species
 				unsigned armLen = 0;
 				for (int k = 0; k < state.arms[i]; k++) {
-					armLen = max(armLen, workerMaxChainLens[pntrPos + j * TOTAL_ARMS]);
+					armLen = max(armLen, workerMaxChainLens[pntrPos + j * MAXPOLY]);
 					pntrPos += 1;
 				}
 				// Print length
