@@ -79,23 +79,12 @@ Should not be smaller than 382 and must be an even number.
 Changing this value will lead to different PRNs being generated. */
 #define PRNG_ARRAY_SIZE 1000
 
-// Controls scaling
-//#define SCALING
-
 // Verbose options
 #define VERBOSELEVEL 0
 #define NODEVERBOSELEVEL 1
 
-// Debugging functions
+// Debugging options
 #define DEBUGLEVEL 0
-
-// Aliases used for printing state info to files
-#define START 0
-#define PROFILES 1
-
-// Aliases used for printing state info to screen
-#define PRESTIRR 0
-#define POSTSTIRR 1
 
 // Miscellaneous defines
 #define START_MWD_SIZE 512 // must be a power of 2
@@ -107,7 +96,9 @@ Changing this value will lead to different PRNs being generated. */
 #define RANK if (myid == 0)
 
 // Initialize various variables
-enum bools {False = 0,True = 1};
+enum bools { False = 0, True = 1 };
+enum { START, PROFILES };             // for writing state info to files
+enum { PRESTIRR, POSTSTIRR };         // for printing state info to the screen
 int myid = -1;
 int numprocs = -1;
 int currentComparisonComplexity = -1;
