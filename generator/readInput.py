@@ -72,6 +72,7 @@ class readInput(object):
         'particlecount':     -1,         # Int, required, no default exists
         'monomernames':      'defnames', # String, required, no default exists
         'seed':              -1,         # Int, not required, no default exists
+        'changeseed':        0,          # Int, not required, default is 0 (= off)
         'calcdist':          0,          # Int, not required, default is 0 (= off)
         
         'syncsimtime':       0,          # Int, required if 'syncevents' is not specified, default is 0 (milliseconds)
@@ -260,6 +261,11 @@ class readInput(object):
         # Check if 'monomeraudit' has a valid value
         if generalDict['monomeraudit'] not in [0,1]:
             print('\nInvalid value specified for "monomeraudit"')
+            return -1
+
+        # Check if 'changeseed' has a valid value
+        if generalDict['changeseed'] not in [0,1]:
+            print('\nInvalid value specified for "changeseed"')
             return -1
 
         return generalDict

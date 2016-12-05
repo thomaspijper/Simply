@@ -146,6 +146,7 @@ def main():
     write.header(outputfile,header)
     write.GLOBAL_MONOMER_PARTICLES(outputfile,generalDict,moleculesList)
     write.SEED(outputfile,generalDict)
+    write.CHANGESEED(outputfile,generalDict)
     write.endingCriteria(outputfile,generalDict)
     write.syncMode(outputfile,generalDict)
     write.MAXMONOMER(outputfile,generalDict)    

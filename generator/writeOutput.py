@@ -83,6 +83,14 @@ class writeOutput(object):
         return True
 
 
+    def CHANGESEED(self, file, generalDict):
+    # Indicate whether or not a monomer audit should be performed at each synchronization
+
+        line = '#define CHANGESEED {0}\n'.format(generalDict['changeseed'])
+        self.writeSingleString(file, line)
+        return True
+
+
     def endingCriteria(self, file, generalDict):
     # Write ending criteria
 

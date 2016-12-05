@@ -62,8 +62,8 @@
 #elif defined(_MSC_VER)
   #include <process.h>  // _getpid()
   #define getpid _getpid
-  #define WIN32_LEAN_AND_MEAN
-  #include <windows.h>
+//  #define WIN32_LEAN_AND_MEAN
+//  #include <windows.h>
 #endif
 
 // Our own headers
@@ -75,9 +75,6 @@
 
 // Controls how chains lengths are handled
 #define EXPLICIT_SYSTEM_STATE
-
-// Controls random number generation
-//#define CHANGE_SEED
 
 /* The number of PRNs to generate at a time.
 Should not be smaller than 382 and must be an even number.
@@ -104,11 +101,6 @@ Changing this value will lead to different PRNs being generated. */
 #define PRESTIRR 0
 #define POSTSTIRR 1
 
-// Messages for setting up data at start
-#define SETUP_END 0
-#define SETUP_CONVDATA 1
-#define SETUP_SYSTEMSCALES 2
-
 // Miscellaneous defines
 #define START_MWD_SIZE 512 // must be a power of 2
 #define INIT_STATE_COMM_SIZE (6 * sizeof(pcount) * START_MWD_SIZE)
@@ -131,6 +123,7 @@ static char dirname[MAX_FILENAME_LEN] = "\0";
 static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
 static const _Bool monomeraudit = MONO_AUDIT;
+static const _Bool changeseed = CHANGESEED;
 
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
@@ -2816,12 +2809,12 @@ int compute(void) {
 		monomerAuditLocal("post communicate");
 #endif
 	
-#ifdef CHANGE_SEED
 		// generate new seed
-		unsigned nextSeed = (unsigned)(lastReduceTime + getpid());
-		dsfmt_gv_init_gen_rand(nextSeed);
-		printf("New random seed is %u\n", nextSeed);
-#endif
+		if (changeseed) {
+			unsigned nextSeed = (unsigned)(lastReduceTime * randomProb(0) + getpid() * randomProb(0));
+			dsfmt_gv_init_gen_rand(nextSeed);
+			RANK printf("New random seed on node 0 is %u\n", nextSeed);
+		}
 
 		// Recalculate what's needed
 		state.temp = state.basetemp + state.deltatemp;
