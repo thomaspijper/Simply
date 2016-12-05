@@ -84,7 +84,7 @@ class writeOutput(object):
 
 
     def CHANGESEED(self, file, generalDict):
-    # Indicate whether or not a monomer audit should be performed at each synchronization
+    # Indicate whether or not the PRNG should be reseeded after each synchronization
 
         line = '#define CHANGESEED {0}\n'.format(generalDict['changeseed'])
         self.writeSingleString(file, line)
@@ -344,6 +344,14 @@ class writeOutput(object):
     # Indicate whether or not a monomer audit should be performed at each synchronization
 
         line = '#define MONO_AUDIT {0}\n'.format(generalDict['monomeraudit'])
+        self.writeSingleString(file, line)
+        return True
+
+
+    def EXPLICITSYSTEM(self, file, generalDict):
+    # Indicate whether or not chain lengths should be considered explicitely
+
+        line = '#define EXPLICITSYSTEM {0}\n'.format(generalDict['explicitsystem'])
         self.writeSingleString(file, line)
         return True
   

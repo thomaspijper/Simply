@@ -71,9 +71,6 @@
 #include "genpolymer.h"
 #include "simply.h"
 
-// Controls how chains lengths are handled
-#define EXPLICIT_SYSTEM_STATE
-
 /* The number of PRNs to generate at a time.
 Should not be smaller than 382 and must be an even number.
 Changing this value will lead to different PRNs being generated. */
@@ -111,6 +108,7 @@ static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
 static const _Bool monomeraudit = MONO_AUDIT;
 static const _Bool changeseed = CHANGESEED;
+static const _Bool explicit = EXPLICITSYSTEM;
 
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
@@ -996,16 +994,16 @@ void initSysState(unsigned seed) {
 	memset(state.reactProbTree, 0, (2 * REACT_PROB_TREE_LEAVES - 1) * sizeof(probability));
 	REACTION_PROBABILITY_TREE_INIT
 
-#ifdef EXPLICIT_SYSTEM_STATE
-	state.expMols = malloc(sizeof(MoleculeList) * NO_OF_MOLSPECS);
-	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
-		size_t initialSize = 10485760;
-		if (i >= MAXSIMPLE) {
-			state.expMols[i].mols = malloc(initialSize * sizeof(chainLen) * (size_t)state.arms[i]);
-			state.expMols[i].maxMolecules = initialSize;
+	if (explicit) {
+		state.expMols = malloc(sizeof(MoleculeList) * NO_OF_MOLSPECS);
+		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
+			size_t initialSize = 10485760;
+			if (i >= MAXSIMPLE) {
+				state.expMols[i].mols = malloc(initialSize * sizeof(chainLen) * (size_t)state.arms[i]);
+				state.expMols[i].maxMolecules = initialSize;
+			}
 		}
 	}
-#endif
 
 	file_write_debug("Initialization of the simulation complete");
 }
@@ -1271,20 +1269,21 @@ void react(void) {
 		state.react_cnts[reactionIndex] += 1;
 
 		react1_ind = state.reactions[reactionIndex].arg_ms1;
-
-#ifdef EXPLICIT_SYSTEM_STATE
-		prm1 = pickRndMolecule_order1(react1_ind, react1_lens, &react1_arms);
-#else
-		prm1 = pickRndMolecule(react1_ind, react1_lens, &react1_arms);
-#endif
+		if (explicit) {
+			prm1 = pickRndMolecule_order1(react1_ind, react1_lens, &react1_arms);
+		}
+		else {
+			prm1 = pickRndMolecule(react1_ind, react1_lens, &react1_arms);
+		}
 
 		if (state.reactions[reactionIndex].arg_ms2 != NO_MOL) {
 			react2_ind = state.reactions[reactionIndex].arg_ms2;
-#ifdef EXPLICIT_SYSTEM_STATE
-			prm2 = pickRndMolecule_order1(react2_ind, react2_lens, &react2_arms);
-#else
-			prm2 = pickRndMolecule(react2_ind, react2_lens, &react2_arms);
-#endif
+			if (explicit) {
+				prm2 = pickRndMolecule_order1(react2_ind, react2_lens, &react2_arms);
+			}
+			else {
+				prm2 = pickRndMolecule(react2_ind, react2_lens, &react2_arms);
+			}
 
 		}
 
@@ -1309,11 +1308,12 @@ void react(void) {
 
 		state.ms_cnts[prod1_ind]++;
 		if (prod1_ind >= MAXSIMPLE) {
-#ifdef EXPLICIT_SYSTEM_STATE
-			adjustMolCnt_order1(prod1_ind, prod1_lens, prod1_arms, 1);
-#else
-			adjustMolCnt(prod1_ind, prod1_lens, prod1_arms, 1);
-#endif
+			if (explicit) {
+				adjustMolCnt_order1(prod1_ind, prod1_lens, prod1_arms, 1);
+			}
+			else {
+				adjustMolCnt(prod1_ind, prod1_lens, prod1_arms, 1);
+			}
 
 			if (DEBUGLEVEL >= 2) {
 				assert(prod1_arms == state.arms[prod1_ind]);
@@ -1322,11 +1322,12 @@ void react(void) {
 		if (no_of_res == 2) {
 			state.ms_cnts[prod2_ind]++;
 			if (prod2_ind >= MAXSIMPLE) {
-#ifdef EXPLICIT_SYSTEM_STATE
-				adjustMolCnt_order1(prod2_ind, prod2_lens, prod2_arms, 1);
-#else
-				adjustMolCnt(prod2_ind, prod2_lens, prod2_arms, 1);
-#endif
+				if (explicit) {
+					adjustMolCnt_order1(prod2_ind, prod2_lens, prod2_arms, 1);
+				}
+				else {
+					adjustMolCnt(prod2_ind, prod2_lens, prod2_arms, 1);
+				}
 			}
 		}
 
@@ -1762,44 +1763,47 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
   type to be specified. As such, use UINT to ensure we can always store the value.
 */
 size_t communicateMaxChainLens(int mode, unsigned *maxChainLens) {
-#ifdef EXPLICIT_SYSTEM_STATE  // Currently only compatible with EXPLICIT_SYSTEM_STATE on
+	if (explicit) {  // Currently only compatible with explicit on
 
 	// Find global maxChainLen for each species
-	size_t bytesNeeded = 0;
-	unsigned commMaxChainLen;
-	int position = 0;
+		size_t bytesNeeded = 0;
+		unsigned commMaxChainLen;
+		int position = 0;
 
-	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
-		if (i >= MAXSIMPLE) {
-			unsigned commChainLen = maxChainLens[position];
-			if (i >= MAXPOLY) { // Complex species, for which maxChainLens actually represents the number of particles
-				MPI_Allreduce(&commChainLen, &commMaxChainLen, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-				bytesNeeded += commMaxChainLen * sizeof(chainLen) * state.arms[i];
+		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
+			if (i >= MAXSIMPLE) {
+				unsigned commChainLen = maxChainLens[position];
+				if (i >= MAXPOLY) { // Complex species, for which maxChainLens actually represents the number of particles
+					MPI_Allreduce(&commChainLen, &commMaxChainLen, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+					bytesNeeded += commMaxChainLen * sizeof(chainLen) * state.arms[i];
+				}
+				else { // Poly species
+					MPI_Allreduce(&commChainLen, &commMaxChainLen, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
+					bytesNeeded += commMaxChainLen * sizeof(pcount);
+				}
 			}
-			else { // Poly species
-				MPI_Allreduce(&commChainLen, &commMaxChainLen, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
-				bytesNeeded += commMaxChainLen * sizeof(pcount);
-			}
+			position += state.arms[i];
 		}
-		position += state.arms[i];
+
+		if (VERBOSELEVEL >= 1) {
+			// Collect maxChainLens from all nodes (poly species only), and print them
+			unsigned *workerMaxChainLens = NULL;
+			RANK workerMaxChainLens = malloc(sizeof(unsigned) * numprocs * MAXPOLY);
+			MPI_Gather(maxChainLens, MAXPOLY, MPI_UNSIGNED, workerMaxChainLens, MAXPOLY, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
+
+			RANK printMaxChainLens(mode, workerMaxChainLens);
+
+			free(workerMaxChainLens);
+		}
+
+		if (VERBOSELEVEL >= 1) {
+			RANK printf("communicateMaxChainLens: bytesNeeded = %zu\n", bytesNeeded);
+		}
+		return bytesNeeded;
 	}
-
-	if (VERBOSELEVEL >= 1) {
-		// Collect maxChainLens from all nodes (poly species only), and print them
-		unsigned *workerMaxChainLens = NULL;
-		RANK workerMaxChainLens = malloc(sizeof(unsigned) * numprocs * MAXPOLY);
-		MPI_Gather(maxChainLens, MAXPOLY, MPI_UNSIGNED, workerMaxChainLens, MAXPOLY, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
-
-		RANK printMaxChainLens(mode, workerMaxChainLens);
-
-		free(workerMaxChainLens);
+	else {
+		return 0;
 	}
-
-	if (VERBOSELEVEL >= 1) {
-		RANK printf("communicateMaxChainLens: bytesNeeded = %zu\n", bytesNeeded);
-	}
-	return bytesNeeded;
-#endif
 }
 
 void print_kinetic_model(void) {
@@ -1842,29 +1846,30 @@ pcount getConvertedMonomer() {
     int i, j;
 	pcount convertedMonomer = 0;
 
-#ifdef EXPLICIT_SYSTEM_STATE
-    for (i = 0; i < NO_OF_MOLSPECS; i++) {
-		if (i >= MAXSIMPLE) {
-			for (j = 0; j < state.arms[i]*state.ms_cnts[i]; j++) {
-				convertedMonomer += state.expMols[i].mols[j];
-			}
-		}
-    }
-#else
-	int length, offset;
-    for (i = 0; i < NO_OF_MOLSPECS; i++) {
-		if (i >= MAXSIMPLE) {
-			for (int a = 0; a < state.arms[i]; a++) {
-				length = 0;
-				offset = state.mwds[i][a].maxEntries - 1;
-				for (j = offset; j < 2*offset+1; j++) {
-					length++;
-					convertedMonomer += length*state.mwds[i][a].mwd_tree[j];
+	if (explicit) {
+		for (i = 0; i < NO_OF_MOLSPECS; i++) {
+			if (i >= MAXSIMPLE) {
+				for (j = 0; j < state.arms[i] * state.ms_cnts[i]; j++) {
+					convertedMonomer += state.expMols[i].mols[j];
 				}
 			}
 		}
-    }
-#endif
+	}
+	else {
+		int length, offset;
+		for (i = 0; i < NO_OF_MOLSPECS; i++) {
+			if (i >= MAXSIMPLE) {
+				for (int a = 0; a < state.arms[i]; a++) {
+					length = 0;
+					offset = state.mwds[i][a].maxEntries - 1;
+					for (j = offset; j < 2 * offset + 1; j++) {
+						length++;
+						convertedMonomer += length*state.mwds[i][a].mwd_tree[j];
+					}
+				}
+			}
+		}
+	}
 
 	return convertedMonomer;
 }
@@ -1955,47 +1960,48 @@ size_t getMaxChainLens(unsigned *max_len_arr_ptr) {
 			max_len_arr_ptr[pos] = 0;
 			pos++;
 		} else {
-#ifdef EXPLICIT_SYSTEM_STATE
-			if (state.arms[i] == 1) { // For single arm species, store max chain length as usual
-				unsigned maxLen = 0;
-				for (pcount x = 0; x < state.ms_cnts[i]; x++) {
-					unsigned tmp = state.expMols[i].mols[x];
-					if (tmp > maxLen)
-						maxLen = tmp;
+			if (explicit) {
+				if (state.arms[i] == 1) { // For single arm species, store max chain length as usual
+					unsigned maxLen = 0;
+					for (pcount x = 0; x < state.ms_cnts[i]; x++) {
+						unsigned tmp = state.expMols[i].mols[x];
+						if (tmp > maxLen)
+							maxLen = tmp;
+					}
+					max_len_arr_ptr[pos] = maxLen;
+					if (VERBOSELEVEL >= 3) {
+						RANK printf("max_len_arr_ptr[%s] on node %d = %u\n", name(i), myid, maxLen);
+					}
+					bytesNeeded += max_len_arr_ptr[pos];
+					pos++;
 				}
-				max_len_arr_ptr[pos] = maxLen;
-				if (VERBOSELEVEL >= 3) {
-					RANK printf("max_len_arr_ptr[%s] on node %d = %u\n", name(i), myid, maxLen);
-				}
-				bytesNeeded += max_len_arr_ptr[pos];
-				pos++;
-			}
-			else { // For complex species, 1st entry stores number of molecules, rest are zero
-				max_len_arr_ptr[pos] = (unsigned)state.ms_cnts[i];
-				if (VERBOSELEVEL >= 3) {
-					RANK printf("max_len_arr_ptr[%s] on node %d = %u\n", name(i), myid, max_len_arr_ptr[pos]);
-				}
-				pos++;
-				for (int a = 1; a < state.arms[i]; a++) {
-					max_len_arr_ptr[pos++] = 0;
-				}
-			}
-#else
-			int currMax;
-			for (int a = 0; a < state.arms[i]; a++) {
-				int offset = state.mwds[i][a].maxEntries - 1;
-				currMax = offset - 1;
-				for (int j = offset; j < 2*offset+1; j++) {
-					if (state.mwds[i][a].mwd_tree[j] > 0) {
-						currMax = j;
+				else { // For complex species, 1st entry stores number of molecules, rest are zero
+					max_len_arr_ptr[pos] = (unsigned)state.ms_cnts[i];
+					if (VERBOSELEVEL >= 3) {
+						RANK printf("max_len_arr_ptr[%s] on node %d = %u\n", name(i), myid, max_len_arr_ptr[pos]);
+					}
+					pos++;
+					for (int a = 1; a < state.arms[i]; a++) {
+						max_len_arr_ptr[pos++] = 0;
 					}
 				}
-				max_len_arr_ptr[pos] = currMax - offset + 1;
-				bytesNeeded += max_len_arr_ptr[pos];
-
-				pos++;
 			}
-#endif
+			else {
+				int currMax;
+				for (int a = 0; a < state.arms[i]; a++) {
+					int offset = state.mwds[i][a].maxEntries - 1;
+					currMax = offset - 1;
+					for (int j = offset; j < 2 * offset + 1; j++) {
+						if (state.mwds[i][a].mwd_tree[j] > 0) {
+							currMax = j;
+						}
+					}
+					max_len_arr_ptr[pos] = currMax - offset + 1;
+					bytesNeeded += max_len_arr_ptr[pos];
+
+					pos++;
+				}
+			}
 		}
     }
 	bytesNeeded *= sizeof(pcount); // Calculate space needed to store MWDs for all species
@@ -2081,48 +2087,49 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 			pos++;
 		}
 		else {
-#ifdef EXPLICIT_SYSTEM_STATE
-			// First set count for all chainlengths to 0, then populate the MWD packet for this species
-			if (state.arms[i] == 1) {
-				memset(packetMwds, 0, maxChainLens[pos] * sizeof(pcount));
-				for (int m = 0; m < state.ms_cnts[i]; m++) {
-					chainLen len = state.expMols[i].mols[m];
-					packetMwds[len-1]++;
+			if (explicit) {
+				// First set count for all chainlengths to 0, then populate the MWD packet for this species
+				if (state.arms[i] == 1) {
+					memset(packetMwds, 0, maxChainLens[pos] * sizeof(pcount));
+					for (int m = 0; m < state.ms_cnts[i]; m++) {
+						chainLen len = state.expMols[i].mols[m];
+						packetMwds[len - 1]++;
+					}
+					packetMwds += maxChainLens[pos];
+					pos++;
 				}
-				packetMwds += maxChainLens[pos];
-				pos++;
+				else {
+					// Hack alert: complex species are stored explicitely in the packet
+					chainLen *compMols = state.expMols[i].mols;
+					size_t bytes = state.ms_cnts[i] * sizeof(chainLen) * state.arms[i];
+					memcpy(packetMwds, compMols, bytes);
+					// maxChainLens[pos] = state.ms_cnts[i]; // redundant line, this is already done in getMaxChainLen()
+					RANK if (VERBOSELEVEL >= 3) {
+						printf("Before stirr: %llu molecules of %s in packet on node 0", state.ms_cnts[i], name(i));
+						if (state.ms_cnts[i] > 0) {
+							printf("; arm lengths:");
+							for (int t = 0; t < state.ms_cnts[i] * state.arms[i]; t++) {
+								printf(" %u", *((chainLen*)packetMwds + t));
+							}
+						}
+						printf("\n");
+					}
+					packetMwds = (pcount*)((char*)packetMwds + bytes);
+					pos++;
+
+					for (int a = 1; a < state.arms[i]; a++) {
+						maxChainLens[pos++] = 0;
+					}
+				}
 			}
 			else {
-				// Hack alert: complex species are stored explicitely in the packet
-				chainLen *compMols = state.expMols[i].mols;
-				size_t bytes = state.ms_cnts[i] * sizeof(chainLen) * state.arms[i];
-				memcpy(packetMwds, compMols, bytes);
-				// maxChainLens[pos] = state.ms_cnts[i]; // redundant line, this is already done in getMaxChainLen()
-				RANK if (VERBOSELEVEL >= 3) {
-					printf("Before stirr: %llu molecules of %s in packet on node 0", state.ms_cnts[i], name(i));
-					if (state.ms_cnts[i] > 0) {
-						printf("; arm lengths:");
-						for (int t = 0; t < state.ms_cnts[i] * state.arms[i]; t++) {
-							printf(" %u", *((chainLen*)packetMwds + t));
-						}
-					}
-					printf("\n");
-				}
-				packetMwds = (pcount*)((char*)packetMwds + bytes);
-				pos++;
-
-				for (int a = 1; a < state.arms[i]; a++) {
-					maxChainLens[pos++] = 0;
+				for (int a = 0; a < state.arms[i]; a++) {
+					pcount *leaves = state.mwds[i][a].mwd_tree + state.mwds[i][a].maxEntries - 1;
+					memcpy(packetMwds, leaves, maxChainLens[pos] * sizeof(pcount));
+					packetMwds += maxChainLens[pos];
+					pos++;
 				}
 			}
-#else
-			for (int a = 0; a < state.arms[i]; a++) {
-				pcount *leaves = state.mwds[i][a].mwd_tree + state.mwds[i][a].maxEntries - 1;
-				memcpy(packetMwds, leaves, maxChainLens[pos] * sizeof(pcount));
-				packetMwds += maxChainLens[pos];
-				pos++;
-			}
-#endif
 		}
 	}
 
@@ -2182,127 +2189,127 @@ void commToState(StatePacket **inStatePacket) {
 
 		state.ms_cnts[i] = 0;
 		
-#ifdef EXPLICIT_SYSTEM_STATE
-		if (state.arms[i] == 1) { // poly species
+		if (explicit) {
+			if (state.arms[i] == 1) { // poly species
 
-			unsigned maxChainLen = maxChainLens[pos];
-			if (VERBOSELEVEL >= 2) {
-				RANK printf("maxChainLen[%s] = %u\n", name(i), maxChainLen);
-			}
-			int takeInterval = numprocs;
-			int takeCounter = myid; // myid functions as offset
-			pcount molsAddedSoFar = 0;
-			
-			for (unsigned j = 0; j < maxChainLen; j++) {
-				pcount mols = *(mwd++);
-				chainLen length = j+1;
-				while (mols > 0) {
-					if (molsAddedSoFar >= state.expMols[i].maxMolecules) {
-						RANK if (VERBOSELEVEL >= 3) {
-							printf("masf = %llu mm = %llu\n", molsAddedSoFar, state.expMols[i].maxMolecules);
+				unsigned maxChainLen = maxChainLens[pos];
+				if (VERBOSELEVEL >= 2) {
+					RANK printf("maxChainLen[%s] = %u\n", name(i), maxChainLen);
+				}
+				int takeInterval = numprocs;
+				int takeCounter = myid; // myid functions as offset
+				pcount molsAddedSoFar = 0;
+
+				for (unsigned j = 0; j < maxChainLen; j++) {
+					pcount mols = *(mwd++);
+					chainLen length = j + 1;
+					while (mols > 0) {
+						if (molsAddedSoFar >= state.expMols[i].maxMolecules) {
+							RANK if (VERBOSELEVEL >= 3) {
+								printf("masf = %llu mm = %llu\n", molsAddedSoFar, state.expMols[i].maxMolecules);
+							}
+							printf("system state expanded for %s in commToState\n", name(i));
+							state.expMols[i].maxMolecules = (pcount)((double)state.expMols[i].maxMolecules * 1.5);
+							chainLen *old = state.expMols[i].mols;
+							state.expMols[i].mols = malloc(sizeof(chainLen)*state.expMols[i].maxMolecules);
+							memcpy(state.expMols[i].mols, old, sizeof(chainLen)*molsAddedSoFar);
+							free(old);
 						}
-						printf("system state expanded for %s in commToState\n", name(i));
-						state.expMols[i].maxMolecules = (pcount)((double)state.expMols[i].maxMolecules * 1.5);
-						chainLen *old = state.expMols[i].mols;
-						state.expMols[i].mols = malloc(sizeof(chainLen)*state.expMols[i].maxMolecules);
-						memcpy(state.expMols[i].mols, old, sizeof(chainLen)*molsAddedSoFar);
-						free(old);
-					}
-					if (takeCounter == 0) { // take the molecule
-						state.expMols[i].mols[molsAddedSoFar++] = length;
-						state.ms_cnts[i] += 1;
-						takeCounter += takeInterval;
-					}
-					takeCounter -= 1;
-					mols--;
-				}
-			}
-
-			pos++;
-
-		}
-		else { // complex species
-			pcount start = leaveSome(maxChainLens[pos]);
-			pcount molecules = takeSome(maxChainLens[pos]);
-			if (VERBOSELEVEL >= 3) {
-				RANK printf("After stirr: %llu molecules of %s on node 0\n", molecules, name(i));
-			}
-
-			pcount end = start + molecules;
-			chainLen *list = (chainLen*)mwd;
-
-			// The complex species must be sorted! This is because different processes
-			// will merge them into the packet in different orders resulting in problems
-			// when the different processes then take molecules to resume simulation with.
-			currentComparisonComplexity = state.arms[i];
-			qsort(list, maxChainLens[pos], sizeof(chainLen)*(size_t)state.arms[i], comparitorComplex);
-
-			state.ms_cnts[i] = 0;
-			for (pcount c = start; c < end; c++) {
-				chainLen *mol = list + state.arms[i] * c;
-				state.ms_cnts[i]++;
-				adjustMolCnt_order1(i, mol, state.arms[i], 1);
-			}
-			
-			mwd = (pcount*)((char*)mwd + sizeof(chainLen) * maxChainLens[pos] * state.arms[i]);
-
-			pos += state.arms[i];
-			RANK if (VERBOSELEVEL >= 3) {
-				printf("After stirr and sort: %llu molecules of %s on node 0", state.ms_cnts[i], name(i));
-				if (state.ms_cnts[i] > 0) {
-					printf("; arm lengths:");
-					for (int t = 0; t < state.ms_cnts[i] * state.arms[i]; t++) {
-						printf(" %u", (unsigned)state.expMols[i].mols[t]);
+						if (takeCounter == 0) { // take the molecule
+							state.expMols[i].mols[molsAddedSoFar++] = length;
+							state.ms_cnts[i] += 1;
+							takeCounter += takeInterval;
+						}
+						takeCounter -= 1;
+						mols--;
 					}
 				}
-				printf("\n");
+
+				pos++;
+
 			}
-			
+			else { // complex species
+				pcount start = leaveSome(maxChainLens[pos]);
+				pcount molecules = takeSome(maxChainLens[pos]);
+				if (VERBOSELEVEL >= 3) {
+					RANK printf("After stirr: %llu molecules of %s on node 0\n", molecules, name(i));
+				}
+
+				pcount end = start + molecules;
+				chainLen *list = (chainLen*)mwd;
+
+				// The complex species must be sorted! This is because different processes
+				// will merge them into the packet in different orders resulting in problems
+				// when the different processes then take molecules to resume simulation with.
+				currentComparisonComplexity = state.arms[i];
+				qsort(list, maxChainLens[pos], sizeof(chainLen)*(size_t)state.arms[i], comparitorComplex);
+
+				state.ms_cnts[i] = 0;
+				for (pcount c = start; c < end; c++) {
+					chainLen *mol = list + state.arms[i] * c;
+					state.ms_cnts[i]++;
+					adjustMolCnt_order1(i, mol, state.arms[i], 1);
+				}
+
+				mwd = (pcount*)((char*)mwd + sizeof(chainLen) * maxChainLens[pos] * state.arms[i]);
+
+				pos += state.arms[i];
+				RANK if (VERBOSELEVEL >= 3) {
+					printf("After stirr and sort: %llu molecules of %s on node 0", state.ms_cnts[i], name(i));
+					if (state.ms_cnts[i] > 0) {
+						printf("; arm lengths:");
+						for (int t = 0; t < state.ms_cnts[i] * state.arms[i]; t++) {
+							printf(" %u", (unsigned)state.expMols[i].mols[t]);
+						}
+					}
+					printf("\n");
+				}
+
+			}
 		}
+		else {
+			pcount ms_cnts_tmp_min = state.localMonomerParticles; // for some reason LONG_LONG_MAX is not defined
+			pcount ms_cnts_tmp_max = 0;
 
-#else
-		pcount ms_cnts_tmp_min = state.localParticles; // for some reason LONG_LONG_MAX is not defined
-		pcount ms_cnts_tmp_max = 0;
-	
-		for (int a = 0; a < state.arms[i]; a++) {
+			for (int a = 0; a < state.arms[i]; a++) {
 
-			while (maxChainLens[pos] > state.mwds[i][a].maxEntries) {
-				fprintf(stderr,"commToState: expanding tree memory for species %s(arm=%d)\n", name(i), a);
-				free(state.mwds[i][a].mwd_tree);
-				state.mwds[i][a].maxEntries *= 2;
-				state.mwds[i][a].mwd_tree = malloc(sizeof(pcount) * (2 * state.mwds[i][a].maxEntries - 1));
+				while (maxChainLens[pos] > state.mwds[i][a].maxEntries) {
+					fprintf(stderr, "commToState: expanding tree memory for species %s(arm=%d)\n", name(i), a);
+					free(state.mwds[i][a].mwd_tree);
+					state.mwds[i][a].maxEntries *= 2;
+					state.mwds[i][a].mwd_tree = malloc(sizeof(pcount) * (2 * state.mwds[i][a].maxEntries - 1));
+				}
+				memset(state.mwds[i][a].mwd_tree, '\0', (2 * state.mwds[i][a].maxEntries - 1) * sizeof(pcount));
+
+				// new MWD becomes leaves in probability tree
+				unsigned entries = state.mwds[i][a].maxEntries;
+				pcount *leaves = state.mwds[i][a].mwd_tree + entries - 1;
+
+				unsigned maxChainLen = maxChainLens[pos];
+				assert(maxChainLen <= entries);
+
+				pcount ms_cnts_tmp = 0;
+				for (unsigned j = 0; j < maxChainLen; j++) {
+					leaves[j] = takeSome(*(mwd++));
+					ms_cnts_tmp += leaves[j];
+				}
+				/* When the total number of arms of complex species are divided
+				 * up, some complex species may get "torn apart" because of the
+				 * way the takeSome() function works. For this reason, the
+				 * ms_cnts is set to the lowest number of whole molecules.
+				 */
+				if (ms_cnts_tmp < ms_cnts_tmp_min)
+					ms_cnts_tmp_min = ms_cnts_tmp;
+				if (ms_cnts_tmp > ms_cnts_tmp_max)
+					ms_cnts_tmp_max = ms_cnts_tmp;
+
+				buildTreeFromLeaves(state.mwds[i][a].mwd_tree, leaves, entries);
+				pos++;
 			}
-			memset(state.mwds[i][a].mwd_tree,'\0',(2*state.mwds[i][a].maxEntries-1)*sizeof(pcount));
-
-			// new MWD becomes leaves in probability tree
-			unsigned entries = state.mwds[i][a].maxEntries;
-			pcount *leaves = state.mwds[i][a].mwd_tree + entries - 1;
-
-			unsigned maxChainLen = maxChainLens[pos];
-			assert(maxChainLen <= entries);
-
-			pcount ms_cnts_tmp = 0;
-			for (unsigned j = 0; j < maxChainLen; j++) {
-				leaves[j] = takeSome(*(mwd++));
-				ms_cnts_tmp += leaves[j];
-			}
-			/* When the total number of arms of complex species are divided
-			 * up, some complex species may get "torn apart" because of the 
-			 * way the takeSome() function works. For this reason, the 
-			 * ms_cnts is set to the lowest number of whole molecules.
-			 */
-			if (ms_cnts_tmp < ms_cnts_tmp_min)
-				ms_cnts_tmp_min = ms_cnts_tmp;
-			if (ms_cnts_tmp > ms_cnts_tmp_max)
-				ms_cnts_tmp_max = ms_cnts_tmp;
-
-			buildTreeFromLeaves(state.mwds[i][a].mwd_tree,leaves,entries);
-			pos++;
+			state.ms_cnts[i] = ms_cnts_tmp_min;
+			if (ms_cnts_tmp_max - ms_cnts_tmp_min > 0)
+				printf("Warning: %lld molecules of species %s temporarily lost upon communication\n", ms_cnts_tmp_max - ms_cnts_tmp_min, name(i));
 		}
-		state.ms_cnts[i] = ms_cnts_tmp_min;
-		if (ms_cnts_tmp_max - ms_cnts_tmp_min > 0)
-			printf("Warning: %lld molecules of species %s temporarily lost upon communication\n", ms_cnts_tmp_max - ms_cnts_tmp_min, name(i));
-#endif
 	}
 
 	size_t bytesForMWDs = getMaxChainLens(maxChainLens);
@@ -2391,103 +2398,104 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 			continue;
 		}
 
-#ifdef EXPLICIT_SYSTEM_STATE
-		if (i >= MAXPOLY) { // Complex species
-			chainLen *mwd_pos_old = (chainLen*)mwd_pos;
+		if (explicit) {
+			if (i >= MAXPOLY) { // Complex species
+				chainLen *mwd_pos_old = (chainLen*)mwd_pos;
 
-			size_t inoutBytes = maxChainLens_inout[pos] * sizeof(chainLen) * state.arms[i];
-			memcpy(mwd_pos, mwd_inout, inoutBytes);
-			mwd_pos = (pcount*)((char*)mwd_pos + inoutBytes);
+				size_t inoutBytes = maxChainLens_inout[pos] * sizeof(chainLen) * state.arms[i];
+				memcpy(mwd_pos, mwd_inout, inoutBytes);
+				mwd_pos = (pcount*)((char*)mwd_pos + inoutBytes);
 
-			size_t inBytes = maxChainLens_in[pos] * sizeof(chainLen) * state.arms[i];
-			memcpy(mwd_pos, mwd_in, inBytes);
-			mwd_pos = (pcount*)((char*)mwd_pos + inBytes);
+				size_t inBytes = maxChainLens_in[pos] * sizeof(chainLen) * state.arms[i];
+				memcpy(mwd_pos, mwd_in, inBytes);
+				mwd_pos = (pcount*)((char*)mwd_pos + inBytes);
 
-			maxChainLens_inout[pos] += maxChainLens_in[pos];
+				maxChainLens_inout[pos] += maxChainLens_in[pos];
 
-			if (VERBOSELEVEL >= 1) {
-				RANK {
-					printf("stirr: %u molecules of %s in stirred packet", maxChainLens_inout[pos], name(i));
-					if (maxChainLens_inout[pos] > 0) {
-						printf("; arm lengths:");
-						for (unsigned t = 0; t < maxChainLens_inout[pos] * state.arms[i]; t++) {
-							printf(" %u", (unsigned)mwd_pos_old[t]);
+				if (VERBOSELEVEL >= 1) {
+					RANK{
+						printf("stirr: %u molecules of %s in stirred packet", maxChainLens_inout[pos], name(i));
+						if (maxChainLens_inout[pos] > 0) {
+							printf("; arm lengths:");
+							for (unsigned t = 0; t < maxChainLens_inout[pos] * state.arms[i]; t++) {
+								printf(" %u", (unsigned)mwd_pos_old[t]);
+							}
 						}
+						printf("\n");
 					}
-					printf("\n");
 				}
-			}
 
-			miscBytes += inoutBytes + inBytes;
-			pos += state.arms[i];
-			mwd_inout = (pcount*)((char*)mwd_inout + inoutBytes);
-			mwd_in    = (pcount*)((char*)mwd_in + inBytes);
+				miscBytes += inoutBytes + inBytes;
+				pos += state.arms[i];
+				mwd_inout = (pcount*)((char*)mwd_inout + inoutBytes);
+				mwd_in = (pcount*)((char*)mwd_in + inBytes);
+			}
+			else { // Poly species
+				/* Allow for the situation which will arise in which a mwd tree in some node
+				   has undergone a size increase before the corresponding mwd in another node.
+
+				   Note: this may no longer be possible now that nodes first agree on an adequate MWD tree size
+				   Redundant code?
+				 */
+				unsigned common = (unsigned)min_value(maxChainLens_in[pos], maxChainLens_inout[pos]);
+				checkMWDs(mwd_in, common, "mwd_in");
+				checkMWDs(mwd_inout, common, "mwd_inout");
+				dvecAdd(mwd_pos, mwd_in, mwd_inout, common);
+
+				assert(state.arms[i] == 1);
+
+				if (maxChainLens_in[pos] > maxChainLens_inout[pos]) {
+					for (unsigned j = common; j < maxChainLens_in[pos]; j++) {
+						mwd_pos[j] = mwd_in[j];
+					}
+				}
+				else {
+					for (unsigned j = common; j < maxChainLens_inout[pos]; j++) {
+						mwd_pos[j] = mwd_inout[j];
+					}
+				}
+				mwd_in += maxChainLens_in[pos];
+				mwd_inout += maxChainLens_inout[pos];
+				maxChainLens_inout[pos] = max_value(maxChainLens_inout[pos], maxChainLens_in[pos]);
+				checkMWDs(mwd_pos, maxChainLens_inout[pos], "mwd_pos");
+				mwd_pos += maxChainLens_inout[pos];
+				totalLength += maxChainLens_inout[pos];
+				if (VERBOSELEVEL >= 2) {
+					RANK printf("stirr: maxChainLens_inout[pos] for species %d is %u\n", i, maxChainLens_inout[pos]);
+				}
+				pos++;
+			}
 		}
-		else { // Poly species
-			/* Allow for the situation which will arise in which a mwd tree in some node
-			   has undergone a size increase before the corresponding mwd in another node.
+		else {
+			for (int a = 0; a < state.arms[i]; a++) {
 
-               Note: this may no longer be possible now that nodes first agree on an adequate MWD tree size
-               Redundant code?
-             */
-			unsigned common = (unsigned)min_value(maxChainLens_in[pos],maxChainLens_inout[pos]);
-			checkMWDs(mwd_in, common, "mwd_in");
-			checkMWDs(mwd_inout, common, "mwd_inout");
-			dvecAdd(mwd_pos, mwd_in, mwd_inout, common);
+				/* Allow for the situation which will arise in which a mwd tree in some node
+				 * has undergone a size increase before the corresponding mwd in another node.
+				 */
+				unsigned common = min_value(maxChainLens_in[pos], maxChainLens_inout[pos]);
+				checkMWDs(mwd_in, common, "mwd_in");
+				checkMWDs(mwd_inout, common, "mwd_inout");
+				dvecAdd(mwd_pos, mwd_in, mwd_inout, common);
 
-			assert(state.arms[i] == 1);
-			
-			if (maxChainLens_in[pos] > maxChainLens_inout[pos]) {
-				for (unsigned j = common; j < maxChainLens_in[pos]; j++) {
-					mwd_pos[j] = mwd_in[j];
+				if (maxChainLens_in[pos] > maxChainLens_inout[pos]) {
+					for (unsigned j = common; j < maxChainLens_in[pos]; j++) {
+						mwd_pos[j] = mwd_in[j];
+					}
 				}
-			}
-			else {
-				for (unsigned j = common; j < maxChainLens_inout[pos]; j++) {
-					mwd_pos[j] = mwd_inout[j];
+				else {
+					for (unsigned j = common; j < maxChainLens_inout[pos]; j++) {
+						mwd_pos[j] = mwd_inout[j];
+					}
 				}
+				mwd_in += maxChainLens_in[pos];
+				mwd_inout += maxChainLens_inout[pos];
+				maxChainLens_inout[pos] = max_value(maxChainLens_inout[pos], maxChainLens_in[pos]);
+				checkMWDs(mwd_pos, maxChainLens_inout[pos], "mwd_pos");
+				mwd_pos += maxChainLens_inout[pos];
+				totalLength += maxChainLens_inout[pos];
+				pos++;
 			}
-			mwd_in += maxChainLens_in[pos];
-			mwd_inout += maxChainLens_inout[pos];
-			maxChainLens_inout[pos] = max_value(maxChainLens_inout[pos], maxChainLens_in[pos]);
-			checkMWDs(mwd_pos,maxChainLens_inout[pos],"mwd_pos");
-			mwd_pos += maxChainLens_inout[pos];
-			totalLength += maxChainLens_inout[pos];
-			if (VERBOSELEVEL >= 2) {
-				RANK printf("stirr: maxChainLens_inout[pos] for species %d is %u\n", i, maxChainLens_inout[pos]);
-			}
-			pos++;
 		}
-#else
-		for (int a = 0; a < state.arms[i]; a++) {
-
-			/* Allow for the situation which will arise in which a mwd tree in some node
-			 * has undergone a size increase before the corresponding mwd in another node.
-			 */
-			unsigned common = min_value(maxChainLens_in[pos], maxChainLens_inout[pos]);
-			checkMWDs(mwd_in, common, "mwd_in");
-			checkMWDs(mwd_inout, common, "mwd_inout");
-			dvecAdd(mwd_pos, mwd_in, mwd_inout, common);
-			
-			if (maxChainLens_in[pos] > maxChainLens_inout[pos]) {
-				for (unsigned j = common; j < maxChainLens_in[pos]; j++) {
-					mwd_pos[j] = mwd_in[j];
-				}
-			}
-			else {
-				for (unsigned j = common; j < maxChainLens_inout[pos]; j++) {
-					mwd_pos[j] = mwd_inout[j];
-				}
-			}
-			mwd_in += maxChainLens_in[pos];
-			mwd_inout += maxChainLens_inout[pos];
-			maxChainLens_inout[pos] = max_value(maxChainLens_inout[pos], maxChainLens_in[pos]);
-			checkMWDs(mwd_pos, maxChainLens_inout[pos], "mwd_pos");
-			mwd_pos += maxChainLens_inout[pos];
-			totalLength += maxChainLens_inout[pos];
-			pos++;
-		}
-#endif
 	}
 
 	mwd_inout = (pcount*)(maxChainLens_inout + TOTAL_ARMS);
@@ -2889,9 +2897,9 @@ int main(int argc, char *argv[]) {
 		printf("\n");
 	}
 
-#ifdef EXPLICIT_SYSTEM_STATE
-	compressState();
-#endif
+	if (explicit) {
+		compressState();
+	}
 	mergeMWDs();
 	RANK file_write_MWDs();
 
