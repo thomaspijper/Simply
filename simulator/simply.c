@@ -62,8 +62,6 @@
 #elif defined(_MSC_VER)
   #include <process.h>  // _getpid()
   #define getpid _getpid
-//  #define WIN32_LEAN_AND_MEAN
-//  #include <windows.h>
 #endif
 
 // Our own headers
@@ -90,8 +88,6 @@ Changing this value will lead to different PRNs being generated. */
 
 // Debugging functions
 #define DEBUGLEVEL 0
-//#define TRACE
-//#define NO_COMM
 
 // Aliases used for printing state info to files
 #define START 0
@@ -846,15 +842,23 @@ void file_write_MWDs(void) {
 	}
 }
 
-/* Writes debug information to file
+/* Writes debug information to a dedicated file
 */
-#if DEBUGLEVEL >= 1
 void file_write_debug(const char *str) {
+
+	if (DEBUGLEVEL < 1) { // Do nothing
+		return;
+	}
+
+	char id[MAX_FILENAME_LEN];
+	snprintf(id, MAX_FILENAME_LEN, "%d", myid);
+
 	// Initialize writing of logfile
 	char logfname[MAX_FILENAME_LEN] = "\0";
 	strAppend(logfname, dirname);
 	strAppend(logfname, simname);
-	strAppend(logfname, "logfile");
+	strAppend(logfname, "logfile-node");
+	strAppend(logfname, id);
 	strAppend(logfname, ".txt");
 	FILE *log;
 	fileOpen(&log, logfname, "a");
@@ -872,7 +876,6 @@ void file_write_debug(const char *str) {
 	// Close log file
 	fclose(log);
 }
-#endif
 
 /* Picks a random reaction by scanning over the rates.
 *
@@ -926,33 +929,26 @@ INLINE int pickRndReaction() {
 		}
 	}
 
-#if DEBUGLEVEL >= 2
-    if (i >= NO_OF_REACTIONS) {
-        printf("pickRndReaction: ran out of reactions, i = %d no reactions = %d\n",i,NO_OF_REACTIONS);
+	if (DEBUGLEVEL >= 2) {
+		if (i >= NO_OF_REACTIONS) {
+			printf("pickRndReaction: ran out of reactions, i = %d no reactions = %d\n", i, NO_OF_REACTIONS);
 
-		dumpReactProbTree();
-		REACTION_PROBABILITY_TREE_INIT
-		dumpReactProbTree();
+			dumpReactProbTree();
+			REACTION_PROBABILITY_TREE_INIT
+				dumpReactProbTree();
 
-		printf("\n original rnd no was %.40f\n",origRnd);
-        exit(EXIT_FAILURE);
-    }
-#endif
-
-#ifdef TRACE
-    printf("reaction %d: ", i);
-    print_reaction(i);
-#endif
-
+			printf("\n original rnd no was %.40f\n", origRnd);
+			exit(EXIT_FAILURE);
+		}
+	}
+	
     return i;
 }
 
 /* Initialise the simulation
  */
 void initSysState(unsigned seed) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Start initialization of the simulation");
-#endif
+	file_write_debug("Start initialization of the simulation");
 
 	dsfmt_gv_init_gen_rand(seed);
 
@@ -1009,7 +1005,6 @@ void initSysState(unsigned seed) {
 	memset(state.reactProbTree, 0, (2 * REACT_PROB_TREE_LEAVES - 1) * sizeof(probability));
 	REACTION_PROBABILITY_TREE_INIT
 
-	
 #ifdef EXPLICIT_SYSTEM_STATE
 	state.expMols = malloc(sizeof(MoleculeList) * NO_OF_MOLSPECS);
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
@@ -1020,9 +1015,8 @@ void initSysState(unsigned seed) {
 		}
 	}
 #endif
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Initialization of the simulation complete");
-#endif
+
+	file_write_debug("Initialization of the simulation complete");
 }
 
 //#if defined(_MSC_VER)
@@ -1049,11 +1043,11 @@ INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
 			curr++;
 			prob -= curr_prob;
 		}
-#if DEBUGLEVEL >= 2
-		if (mwd_tree[curr - 1] < 0) {
-			return (-1);
+		if (DEBUGLEVEL >= 2) {
+			if (mwd_tree[curr - 1] < 0) {
+				return (-1);
+			}
 		}
-#endif
 		mwd_tree[curr - 1]--;
 	}
 
@@ -1069,15 +1063,15 @@ INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
  */
 int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
-#if DEBUGLEVEL >= 2
-    assert(state.ms_cnts[spec_index] > 0);
-	if (state.ms_cnts[spec_index] <= 0) {
-		printf("Trying to pick %s when there are none\n",name(spec_index));
-		print_state();
-		dumpReactProbTree();
-		return -1;
+	if (DEBUGLEVEL >= 2) {
+		assert(state.ms_cnts[spec_index] > 0);
+		if (state.ms_cnts[spec_index] <= 0) {
+			printf("Trying to pick %s when there are none\n", name(spec_index));
+			print_state();
+			dumpReactProbTree();
+			return -1;
+		}
 	}
-#endif
 
     /* decrement global and spec local count */
 	if (state.ms_cnts[spec_index] > 0)
@@ -1092,15 +1086,15 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 		*arms = 1;
 		pcount *mwd_tree = state.mwds[spec_index][0].mwd_tree;
 		int size = state.mwds[spec_index][0].maxEntries;
-		lens[0] = pickRndChainLen(mwd_tree,size);
-#if DEBUGLEVEL >= 2
-		if (lens[0] < 0) {
-			printf("error: chain length < 0 for species %s(arm=0)\n", name(spec_index));
-			print_state();
-			dumpReactProbTree();
-			abort();
+		lens[0] = pickRndChainLen(mwd_tree, size);
+		if (DEBUGLEVEL >= 2) {
+			if (lens[0] < 0) {
+				printf("error: chain length < 0 for species %s(arm=0)\n", name(spec_index));
+				print_state();
+				dumpReactProbTree();
+				abort();
+			}
 		}
-#endif
 
 	}
 	else {
@@ -1111,14 +1105,14 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 			pcount *mwd_tree = state.mwds[spec_index][a].mwd_tree;
 			int size = state.mwds[spec_index][a].maxEntries;
 			lens[a] = pickRndChainLen(mwd_tree, size);
-#if DEBUGLEVEL >= 2
-			if (lens[a] < 0) {
-				printf("error: chain length < 0 for species %s(arm=%d)\n", name(spec_index), a);
-				print_state();
-				dumpReactProbTree();
-				abort();
+			if (DEBUGLEVEL >= 2) {
+				if (lens[a] < 0) {
+					printf("error: chain length < 0 for species %s(arm=%d)\n", name(spec_index), a);
+					print_state();
+					dumpReactProbTree();
+					abort();
+				}
 			}
-#endif
 		}
 	}
 
@@ -1127,15 +1121,15 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
 int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 
-#if DEBUGLEVEL >= 2
-    assert(state.ms_cnts[spec_index] > 0);
-	if (state.ms_cnts[spec_index] <= 0) {
-		printf("Trying to pick %s when there are none\n",name(spec_index));
-		print_state();
-		dumpReactProbTree();
-		return -1;
+	if (DEBUGLEVEL >= 2) {
+		assert(state.ms_cnts[spec_index] > 0);
+		if (state.ms_cnts[spec_index] <= 0) {
+			printf("Trying to pick %s when there are none\n", name(spec_index));
+			print_state();
+			dumpReactProbTree();
+			return -1;
+		}
 	}
-#endif
 
     /* simple molecule, we're done */
     if (spec_index < MAXSIMPLE) {
@@ -1245,9 +1239,8 @@ void print_reaction(int reaction_index) {
 /* React body
  */
 void react(void) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("  Start react() function; performing reactions until next sycnchronization point is reached");
-#endif
+	file_write_debug("  Start react() function; performing reactions until next sycnchronization point is reached");
+
 
 	int             reactionIndex;
 
@@ -1264,7 +1257,7 @@ void react(void) {
     RANK printf("Performing reactions until next sycnchronization point is reached...");
     
 	do {
-       
+
 		/* basic case */
 		react1_arms = 1;
 		react2_arms = 1;
@@ -1272,7 +1265,7 @@ void react(void) {
 		prod2_arms = 1;
 		react2_ind = -1;
 		prod2_ind = -1;
-		no_of_res = 1; 
+		no_of_res = 1;
 		prm1 = 0;
 		prm2 = 0;
 
@@ -1304,12 +1297,12 @@ void react(void) {
 
 		}
 
-#if DEBUGLEVEL >= 2
-		if (prm1 != 0 || prm2 != 0) {
-			printf("Problem reaction %d\n", reactionIndex);
-			abort();
+		if (DEBUGLEVEL >= 2) {
+			if (prm1 != 0 || prm2 != 0) {
+				printf("Problem reaction %d\n", reactionIndex);
+				abort();
+			}
 		}
-#endif
 
 		/*
 		 * Given a reaction index, the lengths l1 and l2  of the reactants (0
@@ -1319,9 +1312,9 @@ void react(void) {
 		switch (reactionIndex)
 			DO_REACT_BODY
 
-#if DEBUGLEVEL >= 2
-		assert(prod1_ind != -1);
-#endif
+		if (DEBUGLEVEL >= 2) {
+			assert(prod1_ind != -1);
+		}
 
 		state.ms_cnts[prod1_ind]++;
 		if (prod1_ind >= MAXSIMPLE) {
@@ -1331,9 +1324,9 @@ void react(void) {
 			adjustMolCnt(prod1_ind, prod1_lens, prod1_arms, 1);
 #endif
 
-#if DEBUGLEVEL >= 2
-			assert(prod1_arms == state.arms[prod1_ind]);
-#endif
+			if (DEBUGLEVEL >= 2) {
+				assert(prod1_arms == state.arms[prod1_ind]);
+			}
 		}
 		if (no_of_res == 2) {
 			state.ms_cnts[prod2_ind]++;
@@ -1451,21 +1444,18 @@ void react(void) {
 		state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 #endif
 
-#if DEBUGLEVEL >= 2
-		assert(rate >= 0);
-#endif
+		if (DEBUGLEVEL >= 2) {
+			assert(rate >= 0);
+		}
 
 		state.events++;
-	}
-
-	while (((state.time < ((ptime)state.nextSynchTime) / 1000) || (state.synchTime == 0)) 
-		  &&
-		  ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
+	} while (((state.time < ((ptime)state.nextSynchTime) / 1000) || (state.synchTime == 0)) 
+		    &&
+		    ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
 
     RANK printf("done!\n");
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("  React() has finished");
-#endif
+
+	file_write_debug("  React() has finished");
 }
 
 // Prints the mwds and molecule counts
@@ -2048,9 +2038,7 @@ size_t requiredStateCommSize(void) {
 }
 
 void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    Starting stateToComm() function");
-#endif
+	file_write_debug("    Starting stateToComm() function");
 
 	// Packet format
 	// [ Header                                                  | Body                                 ]
@@ -2146,9 +2134,8 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 #endif
 		}
 	}
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    stateToComm() has finished");
-#endif
+
+	file_write_debug("    stateToComm() has finished");
 }
 
 int comparitorComplex(const void *m1_, const void *m2_) {
@@ -2169,9 +2156,8 @@ int comparitorComplex(const void *m1_, const void *m2_) {
  * polymeric species.
  */
 void commToState(StatePacket **inStatePacket) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    Starting commToState() function");
-#endif
+	file_write_debug("    Starting commToState() function");
+
 	RANK printf("commToState running...\n");
 	
 	state.noMoreReactions = (*inStatePacket)->noMoreReactions;
@@ -2353,9 +2339,7 @@ void commToState(StatePacket **inStatePacket) {
 		}
 	}
 
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    commToState() has finished");
-#endif
+	file_write_debug("    commToState() has finished");
 }
 
 void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
@@ -2532,9 +2516,7 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 }
 
 int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    Start MPI reduction (stirring)");
-#endif
+	file_write_debug("    Start MPI reduction (stirring)");
 	reduces++;
 	Timer t;
     startTimer(&t);
@@ -2545,9 +2527,7 @@ int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype 
 	
     RANK printf("Reduce time (us) = %llu for %zu bytes\n", rtime, stateCommSize);
 	lastReduceTime = rtime;
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("    MPI reduction (stirring) complete");
-#endif
+	file_write_debug("    MPI reduction (stirring) complete");
     return r;
 }
 
@@ -2648,10 +2628,7 @@ MU_TEST_SUITE(test_suite) {
 
 /*  Parse and apply command line options */
 void argumentParsing(int argc, char *argv[], unsigned *seed) {
-
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Start parsing of command line arguments");
-#endif
+	file_write_debug("Start parsing of command line arguments");
 
 	unsigned arg_seed = UINT_MAX;
 	unsigned arg_synchevents = UINT_MAX;
@@ -2710,15 +2687,11 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 		exit(EXIT_FAILURE);
 	}
 
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Parsing of command line arguments complete");
-#endif
+	file_write_debug("Parsing of command line arguments complete");
 }
 
 int compute(void) {
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Starting simulation");
-#endif
+	file_write_debug("Starting simulation");
 
 	RANK file_write_state(START);
 	RANK file_write_state(PROFILES);
@@ -2763,12 +2736,9 @@ int compute(void) {
 
 		RANK printf("About to synch, time = %f\n", state.time);
 
-#ifndef NO_COMM
-#if DEBUGLEVEL >= 1
-		RANK file_write_debug("  Starting synchronization");
-#endif
-		int reduceRes = 0;
+		file_write_debug("  Starting synchronization");
 
+		int reduceRes = 0;
 		MPI_Op myOp;
 		MPI_Datatype state_t;
 		
@@ -2796,20 +2766,18 @@ int compute(void) {
 		MPI_Type_commit(&state_t); 
 		MPI_Op_create(stirr, True, &myOp);
 			
-		// perform reduction
+		// Perform reduction
 		reduceRes = MPI_Allreduce_wrapper(outStatePacket, inStatePacket, 1, state_t, myOp, MPI_COMM_WORLD);
 
-		// free operation
+		// Free operation
 		MPI_Op_free(&myOp);
 
-		commToState(&inStatePacket); // update the state after stirring
-#if DEBUGLEVEL >= 1
-		RANK file_write_debug("  Synchronization complete");
-#endif
+		// Update the state after stirring
+		commToState(&inStatePacket);
+		file_write_debug("  Synchronization complete");
 		monomerAuditLocal("post communicate");
-#endif
 	
-		// generate new seed
+		// Generate new seed
 		if (changeseed) {
 			unsigned nextSeed = (unsigned)(lastReduceTime * randomProb(0) + getpid() * randomProb(0));
 			dsfmt_gv_init_gen_rand(nextSeed);
@@ -2854,40 +2822,40 @@ int compute(void) {
 		state.nextSynchTime += state.synchTime;
 		state.nextSynchEvents += (rcount)((float)state.synchEvents/(float)numprocs);
     }
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Simulation complete");
-#endif
+	file_write_debug("Simulation complete");
+
     return 0;
 }
 
 int main(int argc, char *argv[]) {
-    MPI_Init(&argc,&argv);
-	MPI_Comm_size(MPI_COMM_WORLD,&numprocs);
-	MPI_Comm_rank(MPI_COMM_WORLD,&myid);
+	MPI_Init(&argc, &argv);
+	MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
+	MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 #if defined(_MSC_VER)
 	QueryPerformanceFrequency(&frequency);
 #endif
 	startTimer(&state.wallTime);
 
 	retreiveHostname();
-	RANK printf("Starting up on host \"%s\"\n", hostname);
-	RANK printf("\n");
-	RANK printf("Simply version 0.99 beta prerelease\n");
-	RANK printf("Program compiled at %s on %s\n",__TIME__,__DATE__);	
-	RANK printf("\n");
-	RANK printf("Number of nodes = %d\n", numprocs);
-	RANK printf("\n");
+	RANK{
+		printf("Starting up on host \"%s\"\n", hostname);
+		printf("\n");
+		printf("Simply version 0.99 beta prerelease\n");
+		printf("Program compiled at %s on %s\n",__TIME__,__DATE__);
+		printf("\n");
+		printf("Number of nodes = %d\n", numprocs);
+		printf("\n");
+	}
+	file_write_debug("");
+	file_write_debug("Simply started");
 
 	// Unit testing
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("");
-	RANK file_write_debug("Simply started. Starting unit testing");
-#endif
-	RANK MU_RUN_SUITE(test_suite);
-	RANK MU_REPORT();
-#if DEBUGLEVEL >= 1
-	RANK file_write_debug("Unit testing complete");
-#endif
+	RANK {
+		file_write_debug("Starting unit testing");
+		MU_RUN_SUITE(test_suite);
+		MU_REPORT();
+		file_write_debug("Unit testing complete");
+	}
 	
 	state.synchTime = SYNCH_TIME_INTERVAL;
 	state.synchEvents = SYNCH_EVENTS_INTERVAL;
