@@ -108,9 +108,16 @@ size_t stateCommSize;
 static char dirname[MAX_FILENAME_LEN] = "\0";
 static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
+
+// Initialize options
 static const _Bool monomeraudit = MONO_AUDIT;
 static const _Bool changeseed = CHANGESEED;
 static const _Bool explicit = EXPLICITSYSTEM;
+static const _Bool calcmoments = CALCMOMENTSOFDIST;
+static const _Bool simulateheating = SIMULATEHEATING;
+static const _Bool recalcconversion = RECALCCONVERSION;
+static const _Bool calcfreevolume = CALCFREEVOLUME;
+static const double coolingrate = COOLINGRATE;
 
 INLINE pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
@@ -241,7 +248,7 @@ void strAppend(char *s1, const char *s2) {
 	}
 #elif defined(__GNUC__)
 	strncat(s1, s2, count);
-	s1[MAX_FILENAME_LEN - 1] = '\0';
+	s1[MAX_FILENAME_LEN - 1] = '\0'; // just to be on the safe side
 #endif
 }
 
@@ -614,12 +621,13 @@ inline void updateTree (int prevReact) __attribute__((always_inline));
 
 INLINE void updateTree(int prevReact) {
 	RATES_UPDATE_BODY
-#ifdef SIMULATEHEATING // Use of TREE_UPDATE_BODY isn't sufficient, so we'll update the entire tree (fast and simple)
-	REACTION_PROBABILITY_TREE_INIT
-#else
-	switch (prevReact)
-		TREE_UPDATE_BODY
-#endif
+	if (simulateheating) { // Use of TREE_UPDATE_BODY currently isn't sufficient, so we'll update the entire tree (fast and simple)
+		REACTION_PROBABILITY_TREE_INIT
+	}
+	else {
+		switch (prevReact)
+			TREE_UPDATE_BODY
+	}
 }
 
 INLINE double toConc(long long ps) {
@@ -687,22 +695,22 @@ void file_write_state(int mode) {
 	if (mode == START) {
 		// Write headers for concentrations
 		fprintf(conc, "Simulation time (s);Conversion");
-#ifdef SIMULATEHEATING
-		fprintf(conc, ";Temperature (K)");
-#endif
+		if (simulateheating) {
+			fprintf(conc, ";Temperature (K)");
+		}
 		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 			fprintf(conc, ";%s (umol/L)", name(i));
 		}
-#ifdef CALCMOMENTSOFDIST
-		fprintf(conc, ";Zeroth moment of dist (umol/L);First moment of dist (umol/L);Second moment of dist (umol/L);Number-average chain length;Weight-average chain length;Polydispersity index");
-#endif
+		if (calcmoments) {
+			fprintf(conc, ";Zeroth moment of dist (umol/L);First moment of dist (umol/L);Second moment of dist (umol/L);Number-average chain length;Weight-average chain length;Polydispersity index");
+		}
 		fprintf(conc, "\n");
 		
 		// Write headers for rates
 		fprintf(rates, "Simulation time (s);Conversion");
-#ifdef SIMULATEHEATING
-		fprintf(rates, ";Temperature (K)");
-#endif
+		if (simulateheating) {
+			fprintf(rates, ";Temperature (K)");
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(rates, ";%s (mol L^-1 s^-1)", rname(i));
 		}
@@ -710,9 +718,9 @@ void file_write_state(int mode) {
 
 		// Write headers for rate coefficients
 		fprintf(ratecoeffs, "Simulation time (s);Conversion");
-#ifdef SIMULATEHEATING
-		fprintf(ratecoeffs, ";Temperature (K)");
-#endif
+		if (simulateheating) {
+			fprintf(ratecoeffs, ";Temperature (K)");
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			if (state.reactions[i].arg_ms2 == NO_MOL) {
 				fprintf(ratecoeffs, ";%s (s^-1)", rname(i));
@@ -725,9 +733,9 @@ void file_write_state(int mode) {
 
 		// Write headers for reaction events
 		fprintf(events, "Simulation time (s);Conversion");
-#ifdef SIMULATEHEATING
-		fprintf(events, ";Temperature (K)");
-#endif
+		if (simulateheating) {
+			fprintf(events, ";Temperature (K)");
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(events, ";%s", rname(i));
 		}
@@ -737,27 +745,27 @@ void file_write_state(int mode) {
 	else if (mode == PROFILES) {
 		// Write concentrations
 		fprintf(conc, "%f;%f", state.time, state.conversion);
-#ifdef SIMULATEHEATING
-		fprintf(conc, ";%.2f", state.temp);
-#endif
+		if (simulateheating) {
+			fprintf(conc, ";%.2f", state.temp);
+		}
 		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 			fprintf(conc, ";%e", 1e6*toConc(state.ms_cnts[i]));
 		}
-#ifdef CALCMOMENTSOFDIST
-		fprintf(conc, ";%e", 1e6*toConc(state.momentDist[0] - 1));
-		fprintf(conc, ";%e", 1e6*toConc(state.momentDist[1] - 1));
-		fprintf(conc, ";%e", 1e6*toConc(state.momentDist[2] - 1));
-		fprintf(conc, ";%e", ((double)state.momentDist[1] / (double)state.momentDist[0]));
-		fprintf(conc, ";%e", ((double)state.momentDist[2] / (double)state.momentDist[1]));
-		fprintf(conc, ";%e", ((double)state.momentDist[2] * (double)state.momentDist[0] / ((double)state.momentDist[1] * (double)state.momentDist[1])));
-#endif
+		if (calcmoments) {
+			fprintf(conc, ";%e", 1e6*toConc(state.momentDist[0] - 1));
+			fprintf(conc, ";%e", 1e6*toConc(state.momentDist[1] - 1));
+			fprintf(conc, ";%e", 1e6*toConc(state.momentDist[2] - 1));
+			fprintf(conc, ";%e", ((double)state.momentDist[1] / (double)state.momentDist[0]));
+			fprintf(conc, ";%e", ((double)state.momentDist[2] / (double)state.momentDist[1]));
+			fprintf(conc, ";%e", ((double)state.momentDist[2] * (double)state.momentDist[0] / ((double)state.momentDist[1] * (double)state.momentDist[1])));
+		}
 		fprintf(conc, "\n");
 
 		// Write rates
 		fprintf(rates, "%f;%f", state.time, state.conversion);
-#ifdef SIMULATEHEATING
-		fprintf(rates, ";%.2f", state.temp);
-#endif
+		if (simulateheating) {
+			fprintf(rates, ";%.2f", state.temp);
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(rates, ";%e", state.reactProbTree[i + REACT_PROB_TREE_LEAVES - 1] / AVOGADRO / state.volume);
 		}
@@ -765,9 +773,9 @@ void file_write_state(int mode) {
 
 		// Write rates coefficients
 		fprintf(ratecoeffs, "%f;%f", state.time, state.conversion);
-#ifdef SIMULATEHEATING
-		fprintf(ratecoeffs, ";%.2f", state.temp);
-#endif
+		if (simulateheating) {
+			fprintf(ratecoeffs, ";%.2f", state.temp);
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			if (state.reactions[i].arg_ms2 == NO_MOL) { // Unimolecular reaction
 				fprintf(ratecoeffs, ";%e", state.reactions[i].rc);
@@ -783,9 +791,9 @@ void file_write_state(int mode) {
 
 		// Write number of reaction events
 		fprintf(events, "%f;%f", state.time, state.conversion);
-#ifdef SIMULATEHEATING
-		fprintf(events, ";%.2f", state.temp);
-#endif
+		if (simulateheating) {
+			fprintf(events, ";%.2f", state.temp);
+		}
 		for (int i = 0; i < NO_OF_REACTIONS; i++) {
 			fprintf(events, ";%llu", state.react_cnts[i]);
 		}
@@ -959,16 +967,18 @@ void initSysState(unsigned seed) {
 	state.temp = STARTTEMP;
 	state.deltatemp = state.temp - state.basetemp;
 
-#ifdef CALCMOMENTSOFDIST
 	/* moments of distribution */
-	state.momentDist[0] = 1;
-	state.momentDist[1] = 1;
-	state.momentDist[2] = 1;
-#endif
-#ifdef CALCFREEVOLUME
+	if (calcmoments) {
+		state.momentDist[0] = 1;
+		state.momentDist[1] = 1;
+		state.momentDist[2] = 1;
+	}
+	
 	/* free volume */
-	state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
-#endif
+	if (calcfreevolume) {
+		state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
+	}
+
     /* MWD_INITS initialises those ms_cnts not set to 0. rely on malloc/memset for the rest */
     MWD_INITS
 
@@ -1342,83 +1352,82 @@ void react(void) {
 			exit(EXIT_FAILURE);
 		}
 
-#ifdef CALCMOMENTSOFDIST
-		// Adjust moments for disappearance reactant 1
-		if (react1_ind >= MAXSIMPLE) {
-			state.momentDist[0] -= 1;
-			if (react1_ind < MAXPOLY) {
-				state.momentDist[1] -= react1_lens[0];
-				state.momentDist[2] -= react1_lens[0] * react1_lens[0];
-			}
-			else {
-				int totalLength = 0;
-				for (int arm = 0; arm < react1_arms; arm++) {
-					totalLength += react1_lens[arm];
+		if (calcmoments) {
+			// Adjust moments for disappearance reactant 1
+			if (react1_ind >= MAXSIMPLE) {
+				state.momentDist[0] -= 1;
+				if (react1_ind < MAXPOLY) {
+					state.momentDist[1] -= react1_lens[0];
+					state.momentDist[2] -= react1_lens[0] * react1_lens[0];
 				}
-				state.momentDist[1] -= totalLength;
-				state.momentDist[2] -= totalLength * totalLength;
-			}
-			// Adjust moments for disappearance reactant 2
-		}
-		if (react2_ind >= MAXSIMPLE) {
-			state.momentDist[0] -= 1;
-			if (react2_ind < MAXPOLY) {
-				state.momentDist[1] -= react2_lens[0];
-				state.momentDist[2] -= react2_lens[0] * react2_lens[0];
-			}
-			else {
-				int totalLength = 0;
-				for (int arm = 0; arm < react2_arms; arm++) {
-					totalLength += react2_lens[arm];
+				else {
+					int totalLength = 0;
+					for (int arm = 0; arm < react1_arms; arm++) {
+						totalLength += react1_lens[arm];
+					}
+					state.momentDist[1] -= totalLength;
+					state.momentDist[2] -= totalLength * totalLength;
 				}
-				state.momentDist[1] -= totalLength;
-				state.momentDist[2] -= totalLength * totalLength;
+				// Adjust moments for disappearance reactant 2
 			}
-		}
-		// Adjust moments for appearance product  1
-		if (prod1_ind >= MAXSIMPLE) {
-			state.momentDist[0] += 1;
-			if (prod1_ind < MAXPOLY) {
-				state.momentDist[1] += prod1_lens[0];
-				state.momentDist[2] += prod1_lens[0] * prod1_lens[0];
-			}
-			else {
-				int totalLength = 0;
-				for (int arm = 0; arm < prod1_arms; arm++) {
-					totalLength += prod1_lens[arm];
-					state.momentDist[1] += totalLength;
-					state.momentDist[2] += totalLength * totalLength;
+			if (react2_ind >= MAXSIMPLE) {
+				state.momentDist[0] -= 1;
+				if (react2_ind < MAXPOLY) {
+					state.momentDist[1] -= react2_lens[0];
+					state.momentDist[2] -= react2_lens[0] * react2_lens[0];
+				}
+				else {
+					int totalLength = 0;
+					for (int arm = 0; arm < react2_arms; arm++) {
+						totalLength += react2_lens[arm];
+					}
+					state.momentDist[1] -= totalLength;
+					state.momentDist[2] -= totalLength * totalLength;
 				}
 			}
-		// Adjust moments for appearance product 2
-		}
-		if (prod2_ind >= MAXSIMPLE) {
-			state.momentDist[0] += 1;
-			if (prod2_ind < MAXPOLY) {
-				state.momentDist[1] += prod2_lens[0];
-				state.momentDist[2] += prod2_lens[0] * prod2_lens[0];
+			// Adjust moments for appearance product  1
+			if (prod1_ind >= MAXSIMPLE) {
+				state.momentDist[0] += 1;
+				if (prod1_ind < MAXPOLY) {
+					state.momentDist[1] += prod1_lens[0];
+					state.momentDist[2] += prod1_lens[0] * prod1_lens[0];
+				}
+				else {
+					int totalLength = 0;
+					for (int arm = 0; arm < prod1_arms; arm++) {
+						totalLength += prod1_lens[arm];
+						state.momentDist[1] += totalLength;
+						state.momentDist[2] += totalLength * totalLength;
+					}
+				}
+				// Adjust moments for appearance product 2
 			}
-			else {
-				int totalLength = 0;
-				for (int arm = 0; arm < prod2_arms; arm++) {
-					totalLength += prod2_lens[arm];
-					state.momentDist[1] += totalLength;
-					state.momentDist[2] += totalLength * totalLength;
+			if (prod2_ind >= MAXSIMPLE) {
+				state.momentDist[0] += 1;
+				if (prod2_ind < MAXPOLY) {
+					state.momentDist[1] += prod2_lens[0];
+					state.momentDist[2] += prod2_lens[0] * prod2_lens[0];
+				}
+				else {
+					int totalLength = 0;
+					for (int arm = 0; arm < prod2_arms; arm++) {
+						totalLength += prod2_lens[arm];
+						state.momentDist[1] += totalLength;
+						state.momentDist[2] += totalLength * totalLength;
+					}
 				}
 			}
 		}
-#endif
 
-#ifdef RECALCCONVERSION
-		// Blindly recalculating the conversion is cheaper than first checking whether the conversion needs to be recalculated
-		state.currentMonomerMolecules = monomerCount();
-		state.conversion = conversion();
-#endif
+		if (recalcconversion) {
+			state.currentMonomerMolecules = monomerCount();
+			state.conversion = conversion();
+		}
 
-#ifdef SIMULATEHEATING
-		state.deltatemp += (state.reactions[reactionIndex].energy / state.volume);
-		state.temp = state.basetemp + state.deltatemp;
-#endif
+		if (simulateheating) {
+			state.deltatemp += (state.reactions[reactionIndex].energy / state.volume);
+			state.temp = state.basetemp + state.deltatemp;
+		}
 
 		probability     rndtime;
 		probability     rate;
@@ -1430,14 +1439,14 @@ void react(void) {
 		deltatime = (-log(rndtime)) / rate;
 		state.time += deltatime;
 
-#ifdef COOLINGRATE
-		state.deltatemp *= exp(-1 * COOLINGRATE * deltatime);
-		state.temp = state.basetemp + state.deltatemp;
-#endif
+		if (COOLINGRATE != 0) { // is integer 0 when cooling is disabled
+			state.deltatemp *= exp(-1 * coolingrate * deltatime);
+			state.temp = state.basetemp + state.deltatemp;
+		}
 
-#ifdef CALCFREEVOLUME
-		state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
-#endif
+		if (calcfreevolume) {
+			state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
+		}
 
 		if (DEBUGLEVEL >= 2) {
 			assert(rate >= 0);
@@ -1540,18 +1549,18 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 	}
 	printf("\n");
 
-#ifdef SIMULATEHEATING
-	// Temperature
-	if (m == PRESTIRR) {
-		for (int i = 0; i < nodesToPrint; i++) {
-			printf("Temperature (K) on node %d = %.2f\n", i, (round(simtemps[i] * 100) / 100));
+	if (simulateheating) {
+		// Temperature
+		if (m == PRESTIRR) {
+			for (int i = 0; i < nodesToPrint; i++) {
+				printf("Temperature (K) on node %d = %.2f\n", i, (round(simtemps[i] * 100) / 100));
+			}
 		}
+		else if (m == POSTSTIRR) {
+			printf("Temperature (K) = %.2f\n", (round(simtemps[0] * 100) / 100));
+		}
+		printf("\n");
 	}
-	else if (m == POSTSTIRR) {
-		printf("Temperature (K) = %.2f\n", (round(simtemps[0] * 100) / 100));
-	}
-	printf("\n");
-#endif
 
 	// Concentrations (and optionally moments of distribution, NACL, WACL, and PDI)
 	for (int i = 0; i < nodeIDLen; i++)
@@ -1587,35 +1596,35 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 		printf("\n");
 	}
 
-#ifdef CALCMOMENTSOFDIST
-	printf("\n");
-	for (size_t i = 0; i < nodeIDLen; i++)
-		printf(" ");
-	printf("0th moment 1st moment 2nd moment\n");
-	for (size_t i = 0; i < nodeIDLen; i++)
-		printf(" ");
-	printf("of distrib of distrib of distrib NACL       WACL       PDI        \n");
-
-	for (int i = 0; i < numprocs; i++) {
-		printf("Node %d", i);
-		if (i == 0) {
-			rankLen = 1;
-		}
-		else {
-			rankLen = (int)log10(i) + 1;
-		}
-		for (int j = 0; j < (nodeIDLen - (5 + rankLen)); j++) {
-			printf(" ");
-		}
-		printf("%.4E ", 1e6*toConc((statemomentdists[0 + i * distNo] - 1)));
-		printf("%.4E ", 1e6*toConc((statemomentdists[1 + i * distNo] - 1)));
-		printf("%.4E ", 1e6*toConc((statemomentdists[2 + i * distNo] - 1)));
-		printf("%.4E ", (double)statemomentdists[1 + i * distNo] / (double)statemomentdists[0 + i * distNo]);
-		printf("%.4E ", (double)statemomentdists[2 + i * distNo] / (double)statemomentdists[1 + i * distNo]);
-		printf("%.4E ", (double)statemomentdists[2 + i * distNo] * (double)statemomentdists[0 + i * distNo] / ((double)statemomentdists[1 + i * distNo] * (double)statemomentdists[1 + i * distNo]));
+	if (calcmoments) {
 		printf("\n");
+		for (size_t i = 0; i < nodeIDLen; i++)
+			printf(" ");
+		printf("0th moment 1st moment 2nd moment\n");
+		for (size_t i = 0; i < nodeIDLen; i++)
+			printf(" ");
+		printf("of distrib of distrib of distrib NACL       WACL       PDI        \n");
+
+		for (int i = 0; i < numprocs; i++) {
+			printf("Node %d", i);
+			if (i == 0) {
+				rankLen = 1;
+			}
+			else {
+				rankLen = (int)log10(i) + 1;
+			}
+			for (int j = 0; j < (nodeIDLen - (5 + rankLen)); j++) {
+				printf(" ");
+			}
+			printf("%.4E ", 1e6*toConc((statemomentdists[0 + i * distNo] - 1)));
+			printf("%.4E ", 1e6*toConc((statemomentdists[1 + i * distNo] - 1)));
+			printf("%.4E ", 1e6*toConc((statemomentdists[2 + i * distNo] - 1)));
+			printf("%.4E ", (double)statemomentdists[1 + i * distNo] / (double)statemomentdists[0 + i * distNo]);
+			printf("%.4E ", (double)statemomentdists[2 + i * distNo] / (double)statemomentdists[1 + i * distNo]);
+			printf("%.4E ", (double)statemomentdists[2 + i * distNo] * (double)statemomentdists[0 + i * distNo] / ((double)statemomentdists[1 + i * distNo] * (double)statemomentdists[1 + i * distNo]));
+			printf("\n");
+		}
 	}
-#endif
 
 	for (size_t j = 0; j < sum; j++)
 		printf("-");
@@ -1640,10 +1649,10 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 	// Collect simulation temperatures
 	double *workerStateTemp = NULL;
-#ifdef SIMULATEHEATING
-	RANK workerStateTemp = malloc(sizeof(double) * (size_t)numprocs);
-	MPI_Gather(&state.temp, 1, MPI_DOUBLE, workerStateTemp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#endif
+	if (simulateheating) {
+		RANK workerStateTemp = malloc(sizeof(double) * (size_t)numprocs);
+		MPI_Gather(&state.temp, 1, MPI_DOUBLE, workerStateTemp, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	}
 
 	// Collect species counts
 	pcount *workerStateCnts = NULL;
@@ -1652,22 +1661,18 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 	// Collect moments of distribution
 	pcount *workerStateMomentDist = NULL;
-#ifdef CALCMOMENTSOFDIST
-	RANK workerStateMomentDist = malloc(sizeof(pcount) * (size_t)numprocs * distNo);
-	MPI_Gather(&state.momentDist, distNo, MPI_UNSIGNED_LONG_LONG, workerStateMomentDist, distNo, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
-#endif
+	if (calcmoments) {
+		RANK workerStateMomentDist = malloc(sizeof(pcount) * (size_t)numprocs * distNo);
+		MPI_Gather(&state.momentDist, distNo, MPI_UNSIGNED_LONG_LONG, workerStateMomentDist, distNo, MPI_UNSIGNED_LONG_LONG, 0, MPI_COMM_WORLD);
+	}
 
 	// Print the state, then free up memory
 	RANK print_state_summary(m, workerStateTime, workerStateConversion, workerStateTemp, workerStateCnts, workerStateMomentDist);
 
 	free(workerStateTime);
-#ifdef SIMULATEHEATING
 	free(workerStateTemp);
-#endif
 	free(workerStateCnts);
-#ifdef CALCMOMENTSOFDIST
 	free(workerStateMomentDist);
-#endif
 }
 
 
@@ -2697,15 +2702,13 @@ int compute(void) {
 	RANK file_write_state(START);
 	RANK file_write_state(PROFILES);
 
-#ifndef NO_COMM
 	StatePacket *outStatePacket = NULL;
 	StatePacket *inStatePacket = NULL;
-#endif
 
 /* Stop if all of the following criteria are met:
     - max simtime is exceeeded
     - max number of events is exceeeded
-    - max conversion number is exceeeded 
+    - max conversion number is exceeeded
    In addition, always stop when the maximum
    walltime has been exceeeded or no more reactions
    are possible on one or more nodes */
@@ -2792,33 +2795,33 @@ int compute(void) {
 		// Recalculate what's needed
 		state.temp = state.basetemp + state.deltatemp;
 		state.conversion = conversion();
-#ifdef CALCFREEVOLUME
-		state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
-#endif
-#ifdef CALCMOMENTSOFDIST
-		state.momentDist[0] = 1;
-		state.momentDist[1] = 1;
-		state.momentDist[2]= 1;
+		if (calcfreevolume) {
+			state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
+		}
+		if (calcmoments) {
+			state.momentDist[0] = 1;
+			state.momentDist[1] = 1;
+			state.momentDist[2] = 1;
 
-		for (int i = 0; i < NO_OF_MOLSPECS; i++) {
+			for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 
-			if (i >= MAXSIMPLE) {
-				state.momentDist[0] += state.ms_cnts[i];
-				size_t arms = state.arms[i];
+				if (i >= MAXSIMPLE) {
+					state.momentDist[0] += state.ms_cnts[i];
+					size_t arms = state.arms[i];
 
-				for (int j = 0; j < state.ms_cnts[i]; j++) {
-					chainLen *lengths = &state.expMols[i].mols[arms*j];
-					chainLen totalLen = 0;
+					for (int j = 0; j < state.ms_cnts[i]; j++) {
+						chainLen *lengths = &state.expMols[i].mols[arms*j];
+						chainLen totalLen = 0;
 
-					for (size_t a = 0; a < arms; a++) {
-						totalLen += lengths[a];
+						for (size_t a = 0; a < arms; a++) {
+							totalLen += lengths[a];
+						}
+						state.momentDist[1] += totalLen;
+						state.momentDist[2] += totalLen * totalLen;
 					}
-					state.momentDist[1] += totalLen;
-					state.momentDist[2] += totalLen * totalLen;
 				}
 			}
 		}
-#endif
 
 		// Print synced results to screen and file
 		state_summary(POSTSTIRR);

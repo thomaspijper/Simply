@@ -250,58 +250,56 @@ class writeOutput(object):
     def SIMULATEHEATING(self, file, generalDict):
     # Write value indicating we want to simulate heating
 
-        if generalDict['simulateheating'] != 0:
-            line = '#define SIMULATEHEATING\n'
-            self.writeSingleString(file, line)
+        line = '#define SIMULATEHEATING {simulateheating}\n'.format(**generalDict)
+        self.writeSingleString(file, line)
         return True
 
 
     def COOLINGRATE(self, file, generalDict):
     # Write the cooling rate of the system to the file
 
-        if (generalDict['coolingrate'] != 0):
+        if (generalDict['coolingrate'] == 0):
+            line = '#define COOLINGRATE 0\n'
+        else:
             line = '#define COOLINGRATE {coolingrate}\n'.format(**generalDict)
-            self.writeSingleString(file, line)
+        self.writeSingleString(file, line)
         return True
 
 
     def RECALCCONVERSION(self, file, generalDict):
     # Indicate whether the conversion should be recalculated on each iteration
 
-        if (generalDict['recalcconversion'] != 0):
-            line = '#define RECALCCONVERSION\n'
-            self.writeSingleString(file, line)
+        line = '#define RECALCCONVERSION {recalcconversion}\n'.format(**generalDict)
+        self.writeSingleString(file, line)
         return True
 
 
     def CALCMOMENTSOFDIST(self, file, generalDict, ratesList):
     # Indicate whether the moments of distribution should be calculated
 
-        flag = 0
+        value = 0
     
         # Check if moments of distribution are required
         for i in range(len(ratesList)):
             if ratesList[i][1] in ['fp','ap','fpr','apr']:
-                flag = 1
+                value = 1
                 break
 
         # Check if the user requested the calculation
-        if flag == 0 and generalDict['calcdist'] != 0:
-            flag = 1
+        if value == 0 and generalDict['calcdist'] != 0:
+            value = 1
         
-        # Print?
-        if flag == 1:
-            line = '#define CALCMOMENTSOFDIST\n'
-            self.writeSingleString(file, line)
+        # Print
+        line = '#define CALCMOMENTSOFDIST {0}\n'.format(value)
+        self.writeSingleString(file, line)
         return True
 
 
     def CALCFREEVOLUME(self, file, generalDict):
     # Indicate whether the free volume fraction should be calculated
 
-        if generalDict['freevolume'] != 0:
-            line = '#define CALCFREEVOLUME\n'
-            self.writeSingleString(file, line)
+        line = '#define CALCFREEVOLUME {freevolume}\n'.format(**generalDict)
+        self.writeSingleString(file, line)
         return True
 
         
@@ -321,13 +319,12 @@ class writeOutput(object):
     def freeVolumeParameters(self, file, generalDict, freeVolumeDict):
     # Write the free volume parameters
 
-        if generalDict['freevolume'] != 0:
-            line = '#define VF0 {vf0}\n'.format(**freeVolumeDict)
-            line = line + '#define ALPHA_M {alpham}\n'.format(**freeVolumeDict)
-            line = line + '#define ALPHA_P {alphap}\n'.format(**freeVolumeDict)
-            line = line + '#define TG_M {tgm}\n'.format(**freeVolumeDict)
-            line = line + '#define TG_P {tgp}\n'.format(**freeVolumeDict)
-            self.writeSingleString(file, line)
+        line = '#define VF0 {vf0}\n'.format(**freeVolumeDict)
+        line = line + '#define ALPHA_M {alpham}\n'.format(**freeVolumeDict)
+        line = line + '#define ALPHA_P {alphap}\n'.format(**freeVolumeDict)
+        line = line + '#define TG_M {tgm}\n'.format(**freeVolumeDict)
+        line = line + '#define TG_P {tgp}\n'.format(**freeVolumeDict)
+        self.writeSingleString(file, line)
         return True
 
         
