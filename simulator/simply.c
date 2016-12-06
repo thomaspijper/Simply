@@ -1463,7 +1463,7 @@ void react(void) {
 }
 
 // Prints the mwds and molecule counts
- void print_state() {
+void print_state() {
 	printf("\n\n");
     for (int i = 0; i < NO_OF_MOLSPECS; i++) {
         if (state.ms_cnts[i] > 0) {
@@ -1633,7 +1633,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 }
 
- void state_summary(int m) {
+void state_summary(int m) {
 
 	int distNo = 3; // zeroth, first, and second moment of distribution
 
