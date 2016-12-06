@@ -57,6 +57,8 @@
 #if defined(__GNUC__)
   #include <unistd.h>	// POSIX headers, getpid(), gethostname()
   #include <sys/time.h> // gettimeofday()
+  #include <errno.h>    // errno
+  #include <dirent.h>   // DIR
   #define _GNU_SOURCE
   #define _BSD_SOURCE
 #elif defined(_MSC_VER)
@@ -239,7 +241,7 @@ void strAppend(char *s1, const char *s2) {
 	}
 #elif defined(__GNUC__)
 	strncat(s1, s2, count);
-	s1[MAX_FILENAME_LEN - 1] = "\0";
+	s1[MAX_FILENAME_LEN - 1] = '\0';
 #endif
 }
 
@@ -284,10 +286,10 @@ double readTimerSec(Timer *t) {
 /* Get the current time (currently used for debugging only) */
 INLINE void getSystemTimeString(char *timeStampString) {
 #if defined(__GNUC__)
-	timeval fileTime;
-	tm systemTime;
+	struct timeval fileTime;
+	struct tm systemTime;
 
-	gettimeofday(fileTime, NULL);
+	gettimeofday(&fileTime, NULL);
 	localtime_r(&fileTime.tv_sec, &systemTime);
 	long ms = fileTime.tv_usec / 1000;
 	snprintf(timeStampString, 27, "[%04d-%02d-%02d %02d:%02d:%02d:%03ld] ", systemTime.tm_year, systemTime.tm_mon, systemTime.tm_mday,
@@ -858,7 +860,8 @@ void file_write_debug(const char *str) {
 	fprintf(log, "%s%s\n", timeStampString, str);
 	fflush(log);
 #if defined(__GNUC__)
-	fsync(log);
+	int fd = fileno(log);
+	fsync(fd);
 #elif defined(_MSC_VER)
 	FlushFileBuffers(log);
 #endif
@@ -2312,7 +2315,6 @@ void commToState(StatePacket **inStatePacket) {
 		}
 	}
 
-	size_t bytesForMWDs = getMaxChainLens(maxChainLens);
 	if (VERBOSELEVEL >= 1) {
 		communicateMaxChainLens(POSTSTIRR, maxChainLens);
 	}
@@ -2578,7 +2580,7 @@ MU_TEST(myid_test) {
 /*  Test whether whether PRNG_ARRAY_SIZE is set correctly and the PRNG gives the expected numbers (the latter ensures reproducibility of results) */
 MU_TEST(dSFMT_test) {
 	char errormsg[100];
-	snprintf(errormsg, 100, "PRNG_ARRAY_SIZE may not be smaller than %d\0", DSFMT_N64);
+	snprintf(errormsg, 100, "PRNG_ARRAY_SIZE may not be smaller than %d", DSFMT_N64);
 	mu_assert(PRNG_ARRAY_SIZE >= DSFMT_N64, errormsg);
 	mu_assert((PRNG_ARRAY_SIZE % 2) == 0, "PRNG_ARRAY_SIZE must be an even number");
 
@@ -2767,6 +2769,10 @@ int compute(void) {
 			
 		// Perform reduction
 		reduceRes = MPI_Allreduce_wrapper(outStatePacket, inStatePacket, 1, state_t, myOp, MPI_COMM_WORLD);
+		if (reduceRes != MPI_SUCCESS) {
+			RANK printf("\nError during synchronization! PMPI_Allreduce error code is %d\nExiting...\n\n", reduceRes);
+			exit(EXIT_FAILURE);
+		}
 
 		// Free operation
 		MPI_Op_free(&myOp);

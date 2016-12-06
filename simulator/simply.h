@@ -59,8 +59,8 @@ typedef struct {
    Windows: use LARGE_INTEGER to store the stamps of QueryPerformanceCounter (divide by frequency later) */
 typedef struct {
 #if defined(__GNUC__)
-	timeval start_t;
-	timeval end_t;
+	struct timeval start_t;
+	struct timeval end_t;
 #elif defined(_MSC_VER)
 	LARGE_INTEGER start_t;
 	LARGE_INTEGER end_t;
