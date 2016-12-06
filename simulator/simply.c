@@ -2696,7 +2696,7 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 	file_write_debug("Parsing of command line arguments complete");
 }
 
-int compute(void) {
+void compute(void) {
 	file_write_debug("Starting simulation");
 
 	RANK file_write_state(START);
@@ -2832,7 +2832,7 @@ int compute(void) {
     }
 	file_write_debug("Simulation complete");
 
-    return 0;
+    return;
 }
 
 int main(int argc, char *argv[]) {
