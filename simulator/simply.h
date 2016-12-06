@@ -139,9 +139,9 @@ typedef struct {
 } StatePacket;
 
 
-void print_state(void);
-INLINE const char *name(int index);
-INLINE const char *rname(int index);
-void print_reaction(int reaction_index);
-void print_kinetic_model(void);
-void monomerAudit(const char *str);
+static void print_state(void);
+INLINE static const char *name(int index);
+INLINE static const char *rname(int index);
+static void print_reaction(int reaction_index);
+static void print_kinetic_model(void);
+static void monomerAudit(const char *str);

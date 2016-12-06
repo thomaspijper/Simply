@@ -79,7 +79,7 @@ Changing this value will lead to different PRNs being generated. */
 #define PRNG_ARRAY_SIZE 1000
 
 // Verbose options
-#define VERBOSELEVEL 0
+#define VERBOSELEVEL 1
 #define NODEVERBOSELEVEL 1
 
 // Debugging options
@@ -119,11 +119,11 @@ static const _Bool recalcconversion = RECALCCONVERSION;
 static const _Bool calcfreevolume = CALCFREEVOLUME;
 static const double coolingrate = COOLINGRATE;
 
-INLINE pcount max_value(pcount x, pcount y) {
+INLINE static pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
 }
 
-INLINE pcount min_value(pcount x, pcount y) {
+INLINE static pcount min_value(pcount x, pcount y) {
 	return (x > y ? y : x);
 }
 
@@ -145,7 +145,7 @@ static size_t rndCounter2 = PRNG_ARRAY_SIZE;
      randomProb(3) returns number in interval [0,1] -- currently (0,1)
      randomProb(4) forces all arrays to be recomputed
  */
-INLINE double randomProb(int x) {
+INLINE static double randomProb(int x) {
 	if ((x == 0)
 		|| (x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
 		if (rndCounter0 == PRNG_ARRAY_SIZE) {
@@ -189,7 +189,7 @@ INLINE double randomProb(int x) {
 /* Makes each process take the correct number of particles, ensuring conservation of
    particles accross all systems.
  */
-INLINE pcount takeSome(pcount total) {
+INLINE static pcount takeSome(pcount total) {
 	pcount ans = total/numprocs;
 	pcount leftovers = total % (pcount)numprocs;
 	if (myid < leftovers) {
@@ -198,7 +198,7 @@ INLINE pcount takeSome(pcount total) {
 	return ans;
 }
 
-INLINE pcount leaveSome(pcount total) {
+INLINE static pcount leaveSome(pcount total) {
 	pcount rough = total/numprocs;
 	pcount leftovers = total % (pcount)numprocs;
 	pcount correction = (myid >= leftovers) ? leftovers : myid;
@@ -208,7 +208,7 @@ INLINE pcount leaveSome(pcount total) {
 
 /* Deals with overflow of array containing mwd tree
  */
-void double_arraysize(pcount **arr, size_t curr_size) {
+static void double_arraysize(pcount **arr, size_t curr_size) {
 	size_t newsize = 2 * curr_size;
 	pcount *new_arr = calloc(sizeof(pcount) * (2 * newsize - 1), 1);
 	pcount *old_arr = *arr;
@@ -230,7 +230,7 @@ void double_arraysize(pcount **arr, size_t curr_size) {
 
 /* Appends string s2 to string s1. Both strings should be defined.
 */
-void strAppend(char *s1, const char *s2) {
+static void strAppend(char *s1, const char *s2) {
 	size_t len1 = strlen(s1);
 	size_t len2 = strlen(s2);
 	if ((len1 + len2) > MAX_FILENAME_LEN) {
@@ -255,7 +255,7 @@ void strAppend(char *s1, const char *s2) {
 // ************* begin timer code ********
 
 /* Start a timer */
-void startTimer(Timer *t) {
+static void startTimer(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->start_t,NULL);
 #elif defined(_MSC_VER)
@@ -264,7 +264,7 @@ void startTimer(Timer *t) {
 }
 
 /* Read a timer, return microseconds */
-unsigned long long readTimer(Timer *t) {
+static unsigned long long readTimer(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->end_t,NULL);
 	return (1000000 * t->end_t.tv_sec + t->end_t.tv_usec) - (1000000 * t->start_t.tv_sec + t->start_t.tv_usec);
@@ -276,7 +276,7 @@ unsigned long long readTimer(Timer *t) {
 }
 
 /* Read a timer, return seconds */
-double readTimerSec(Timer *t) {
+static double readTimerSec(Timer *t) {
 #if defined(__GNUC__)
 	gettimeofday(&t->end_t,NULL);
 	double begin = (double)t->start_t.tv_sec + t->start_t.tv_usec / 1000000.0;
@@ -291,7 +291,7 @@ double readTimerSec(Timer *t) {
 }
 
 /* Get the current time (currently used for debugging only) */
-INLINE void getSystemTimeString(char *timeStampString) {
+INLINE static void getSystemTimeString(char *timeStampString) {
 #if defined(__GNUC__)
 	struct timeval fileTime;
 	struct tm systemTime;
@@ -318,7 +318,7 @@ INLINE void getSystemTimeString(char *timeStampString) {
 
 
 /* Gets the host name of the system */
-void retreiveHostname(void) {
+static void retreiveHostname(void) {
 #if defined(_MSC_VER)
 	unsigned len = MAX_HOSTNAME_LEN - 1;
 	BOOL r = GetComputerName(hostname, &len);
@@ -337,7 +337,7 @@ void retreiveHostname(void) {
 }
 
 /* Parses a string containing a path */
-void parseDirname(char* path) {
+static void parseDirname(char* path) {
 #if defined(_MSC_VER)
 	// Check and repair a path that was placed between double quotes and than ended with a '\'
 	// such as "C:\Data files\" as the final backslash will be seen as an escape character
@@ -394,7 +394,7 @@ void parseDirname(char* path) {
 #endif
 }
 
-void dumpTree(mwdStore *x) {
+static void dumpTree(const mwdStore *x) {
 	for (size_t i = 1; i <= x->maxEntries; i *= 2) {
 		for (size_t j = 0; j < i; j++) {
 			printf(" %llu",x->mwd_tree[i - 1 + j]);
@@ -403,7 +403,7 @@ void dumpTree(mwdStore *x) {
 	}
 }
 
-void dumpAllTrees() {
+static void dumpAllTrees() {
 	for (int i =0; i < NO_OF_MOLSPECS; i++) {
 		printf("%s:\n",name(i));
 		for (int a=0; a < state.arms[i]; a++) {
@@ -412,7 +412,7 @@ void dumpAllTrees() {
 	}
 }
 
-INLINE void adjustTree(int spec_ind, mwdStore  *mwd, int leave_ind, int diff) {
+INLINE static void adjustTree(int spec_ind, mwdStore *mwd, int leave_ind, int diff) {
 	while (leave_ind >= mwd->maxEntries) {
 		printf("tree data structure overflow: %s leaveIx = %d maxEntries = %d\n", name(spec_ind),leave_ind, mwd->maxEntries);
 		double_arraysize(&(mwd->mwd_tree), (size_t)mwd->maxEntries);
@@ -431,13 +431,13 @@ INLINE void adjustTree(int spec_ind, mwdStore  *mwd, int leave_ind, int diff) {
 /* Add 'diff' molecules of chain length (leave_ind + 1) of type
    spec_ind into tree. Increase tree size if necessary.
  */
-INLINE void adjustMolCnt(int spec_ind, chainLen *lengths, int arms, int diff) {
+INLINE static void adjustMolCnt(int spec_ind, chainLen *lengths, int arms, int diff) {
 	if (spec_ind < MAXPOLY) {
-		adjustTree(spec_ind, &state.mwds[spec_ind][0], lengths[0]-1,diff);
+		adjustTree(spec_ind, &state.mwds[spec_ind][0], lengths[0]-1, diff);
 	}
 	else {
 		for (int a=0; a<arms; a++) {
-			adjustTree(spec_ind, &state.mwds[spec_ind][a], lengths[a]-1,diff);
+			adjustTree(spec_ind, &state.mwds[spec_ind][a], lengths[a]-1, diff);
 		}
 	}
 }
@@ -447,7 +447,7 @@ INLINE void adjustMolCnt(int spec_ind, chainLen *lengths, int arms, int diff) {
  * when dumping detailed system contents.
  * Only generates leaves of MWD trees.
  */
-void compressState(void) {
+static void compressState(void) {
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
 		int arms = state.arms[i];
 		if (i >= MAXSIMPLE) {
@@ -497,7 +497,7 @@ void compressState(void) {
 /*
  * Converts compact representation to explicit representation. Currently nonfunctional; requires review/debugging.
  */
-void decompressState(void) {
+static void decompressState(void) {
 	printf("decompressStateRunning... ");
 	for (int i=0; i < NO_OF_MOLSPECS; i++) {
 		memset(state.expMols[i].mols, 0, sizeof(chainLen) * state.expMols[i].maxMolecules * state.arms[i]);
@@ -529,7 +529,7 @@ void decompressState(void) {
 }
 
 /* Merges MWDs in compact representation to node 0. For use when dumping system contents */
-void mergeMWDs(void) {
+static void mergeMWDs(void) {
 	if (numprocs < 2) { // Nothing to do
 		return;
 	}
@@ -558,12 +558,12 @@ void mergeMWDs(void) {
 }
 
 /* For O(1) algorithm, uses large amounts of memory */
-INLINE void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int diff) {
+INLINE static void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int diff) {
 	pcount molecules = state.ms_cnts[spec_ind];
 
 	if (molecules > state.expMols[spec_ind].maxMolecules) {
 		state.expMols[spec_ind].maxMolecules = (pcount)((double)state.expMols[spec_ind].maxMolecules * 1.5);
-		printf("Explicit sys state expanded for species %s from %llu to %llu\n", name(spec_ind), (molecules-1), state.expMols[spec_ind].maxMolecules);
+		RANK printf("Explicit sys state expanded for species %s from %llu to %llu\n", name(spec_ind), (molecules-1), state.expMols[spec_ind].maxMolecules);
 		chainLen *old = state.expMols[spec_ind].mols;
 		state.expMols[spec_ind].mols = malloc(state.expMols[spec_ind].maxMolecules*arms*sizeof(chainLen));
 		memcpy(state.expMols[spec_ind].mols, old, sizeof(chainLen)*(molecules-1)*arms);
@@ -575,7 +575,7 @@ INLINE void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int d
 	}
 }
 
-INLINE pcount monomerCount() {
+INLINE static pcount monomerCount() {
 	pcount cnt = 0;
 	for (int i = 0; i < MAXMONOMER; i++) {
 		cnt += state.ms_cnts[i];
@@ -583,7 +583,7 @@ INLINE pcount monomerCount() {
 	return cnt;
 }
 
-INLINE float conversion(void) {
+INLINE static float conversion(void) {
 	float conversion = ((float)state.localMonomerParticles * (float)state.scaleFactor - (float)state.currentMonomerMolecules) / ((float)state.localMonomerParticles*state.scaleFactor);
 	return conversion;
 }
@@ -592,17 +592,15 @@ INLINE float conversion(void) {
  *  Returns number of molecules of type spec_ind and length 
  *  (leave_ind +1)
  */
-pcount getMolCnt(int spec_ind, int arm, int leave_ind) {
+static pcount getMolCnt(int spec_ind, int arm, int leave_ind) {
 	int ix = leave_ind+state.mwds[spec_ind][arm].maxEntries-1;
 	pcount cnt = state.mwds[spec_ind][arm].mwd_tree[ix];
 
 	return cnt;
 }
 
-void dumpReactProbTree() {
-
+static void dumpReactProbTree() {
 	int nextLev = 2;
-	
 	for (int j=0; j<2*REACT_PROB_TREE_LEAVES-1; j++) {
 		printf (" %.40f",state.reactProbTree[j]);
 		if (j == nextLev-2) {
@@ -613,13 +611,15 @@ void dumpReactProbTree() {
 	printf("\n\n");
 }
 
+
 #if defined(_MSC_VER)
-__forceinline void updateTree(int prevReact);
+__forceinline static void updateTree(int prevReact);
 #elif defined(__GNUC__)
-inline void updateTree (int prevReact) __attribute__((always_inline));
+inline static void updateTree (int prevReact) __attribute__((always_inline));
 #endif
 
-INLINE void updateTree(int prevReact) {
+
+INLINE static void updateTree(int prevReact) {
 	RATES_UPDATE_BODY
 	if (simulateheating) { // Use of TREE_UPDATE_BODY currently isn't sufficient, so we'll update the entire tree (fast and simple)
 		REACTION_PROBABILITY_TREE_INIT
@@ -630,13 +630,13 @@ INLINE void updateTree(int prevReact) {
 	}
 }
 
-INLINE double toConc(long long ps) {
+INLINE static double toConc(long long ps) {
 	return (ps / AVOGADRO / state.volume);
 }
 
 /* Opens a file
 */
-void fileOpen(FILE **stream, const char *filename, const char *mode) {
+static void fileOpen(FILE **stream, const char *filename, const char *mode) {
 #if defined(_MSC_VER)
 	int r = fopen_s(stream, filename, mode);
 	if (r != 0) {
@@ -654,7 +654,7 @@ void fileOpen(FILE **stream, const char *filename, const char *mode) {
 
 /* Writes state information to files
 */
-void file_write_state(int mode) {
+static void file_write_state(int mode) {
 
 	// Initialize writing of concentrations
 	char concfname[MAX_FILENAME_LEN] = "\0";
@@ -809,7 +809,7 @@ void file_write_state(int mode) {
 
 /* Write MWD of each poly/complex species to files
 */
-void file_write_MWDs(void) {
+static void file_write_MWDs(void) {
 	char timeStr[MAX_FILENAME_LEN];
 	snprintf(timeStr, MAX_FILENAME_LEN, "%d", (int)round(state.time));
 	char id[MAX_FILENAME_LEN];
@@ -843,7 +843,7 @@ void file_write_MWDs(void) {
 
 /* Writes debug information to a dedicated file
 */
-void file_write_debug(const char *str) {
+static void file_write_debug(const char *str) {
 
 	if (DEBUGLEVEL < 1) { // Do nothing
 		return;
@@ -886,13 +886,15 @@ void file_write_debug(const char *str) {
 * This would probably pay off for systems with a higher number
 * of reactions.
 */
+
 #if defined(_MSC_VER)
-__forceinline int pickRndReaction();
+__forceinline static int pickRndReaction();
 #elif defined(__GNUC__)
-inline int pickRndReaction() __attribute__((always_inline));
+inline static int pickRndReaction() __attribute__((always_inline));
 #endif
 
-INLINE int pickRndReaction() {
+
+INLINE static int pickRndReaction() {
     probability	rate;
     int			i;
     probability	rnd, origRnd;
@@ -947,7 +949,7 @@ INLINE int pickRndReaction() {
 
 /* Initialise the simulation
  */
-void initSysState(unsigned seed) {
+static void initSysState(unsigned seed) {
 	file_write_debug("Start initialization of the simulation");
 
 	dsfmt_gv_init_gen_rand(seed);
@@ -1021,13 +1023,15 @@ void initSysState(unsigned seed) {
 	file_write_debug("Initialization of the simulation complete");
 }
 
-//#if defined(_MSC_VER)
-//__forceinline int pickRndChainLen(pcount *mwd_tree, int size);
-//#elif defined(__GNUC__)
-//inline int pickRndChainLen(pcount *mwd_tree, int size) __attribute__((always_inline));
-//#endif
+/*
+#if defined(_MSC_VER)
+__forceinline int pickRndChainLen(pcount *mwd_tree, int size);
+#elif defined(__GNUC__)
+inline int pickRndChainLen(pcount *mwd_tree, int size) __attribute__((always_inline));
+#endif
+*/
 
-INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
+INLINE static int pickRndChainLen(pcount *mwd_tree, int size) {
 
 	probability     prob, curr_prob;
 
@@ -1063,7 +1067,7 @@ INLINE int pickRndChainLen(pcount *mwd_tree, int size) {
  *  system. Returns: length of molecule picked.
  * From CodeGen polysim.c.
  */
-int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
+static int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 
 	if (DEBUGLEVEL >= 2) {
 		assert(state.ms_cnts[spec_index] > 0);
@@ -1121,7 +1125,7 @@ int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 	return 0;
 }
 
-int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
+static int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 
 	if (DEBUGLEVEL >= 2) {
 		assert(state.ms_cnts[spec_index] > 0);
@@ -1156,7 +1160,7 @@ int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 	}
 }
 
-INLINE const char *name(int index) {
+INLINE static const char *name(int index) {
     switch (index) 
         MOLECULENAMES
     
@@ -1164,7 +1168,7 @@ INLINE const char *name(int index) {
 }
 
 
-INLINE const char *rname(int index) {
+INLINE static const char *rname(int index) {
 	switch (index) 
 		REACTIONNAMES
 	
@@ -1174,7 +1178,7 @@ INLINE const char *rname(int index) {
 /* Scales number of particles and (rate coefficients accordingly) by
  * factor.
  */
-void scaleSystem(double factor) {
+static void scaleSystem(double factor) {
 
 	if (factor < 1.0) {
 		printf("Scaling factors < 1 not yet dealt with\n");
@@ -1226,7 +1230,7 @@ void scaleSystem(double factor) {
  *   (we could print the name of the reaction as well, would need to
  *   generate code for this -- see name (..))
  */
-void print_reaction(int reaction_index) {
+static void print_reaction(int reaction_index) {
     printf("%s ", name(state.reactions[reaction_index].arg_ms1));
     if (state.reactions[reaction_index].arg_ms2 < NO_MOL) {
         printf("+ %s ", name(state.reactions[reaction_index].arg_ms2));
@@ -1240,7 +1244,7 @@ void print_reaction(int reaction_index) {
 
 /* React body
  */
-void react(void) {
+static void react(void) {
 	file_write_debug("  Start react() function; performing reactions until next sycnchronization point is reached");
 
 
@@ -1463,7 +1467,7 @@ void react(void) {
 }
 
 // Prints the mwds and molecule counts
-void print_state() {
+static void print_state() {
 	printf("\n\n");
     for (int i = 0; i < NO_OF_MOLSPECS; i++) {
         if (state.ms_cnts[i] > 0) {
@@ -1493,7 +1497,7 @@ void print_state() {
 	printf("\n");
 }
 
-void print_state_summary(int m, ptime *simtimes, float *simconversions, double *simtemps, pcount *statecnts, pcount *statemomentdists) {
+static void print_state_summary(const int m, const ptime *simtimes, const float *simconversions, const double *simtemps, const pcount *statecnts, const pcount *statemomentdists) {
 
 	size_t nameLens[NO_OF_MOLSPECS];
 	size_t maxNumLen = strlen("0.0000e+00");
@@ -1633,7 +1637,7 @@ void print_state_summary(int m, ptime *simtimes, float *simconversions, double *
 
 }
 
-void state_summary(int m) {
+static void state_summary(const int m) {
 
 	int distNo = 3; // zeroth, first, and second moment of distribution
 
@@ -1677,7 +1681,7 @@ void state_summary(int m) {
 
 
 /* Prints maxChainLen for all poly species */
-void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
+static void printMaxChainLens(const int mode, const unsigned *workerMaxChainLens) {
 
 	size_t maxNameLen = 10; // 9 characters and 1 space
 	size_t nodeIDLen = 11; // length unsigned int (10 digits max) and 1 space
@@ -1770,7 +1774,7 @@ void printMaxChainLens(int mode, unsigned *workerMaxChainLens) {
   The width of 'chainLen' is variable but the MPI command requires a certain data
   type to be specified. As such, use UINT to ensure we can always store the value.
 */
-size_t communicateMaxChainLens(int mode, unsigned *maxChainLens) {
+static size_t communicateMaxChainLens(const int mode, const unsigned *maxChainLens) {
 	if (explicit) {  // Currently only compatible with explicit on
 
 	// Find global maxChainLen for each species
@@ -1814,7 +1818,7 @@ size_t communicateMaxChainLens(int mode, unsigned *maxChainLens) {
 	}
 }
 
-void print_kinetic_model(void) {
+static void print_kinetic_model(void) {
 	printf("\tname\ttype\n");
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
         char *typeStr;
@@ -1850,7 +1854,7 @@ void print_kinetic_model(void) {
 	}
 }
 
-pcount getConvertedMonomer() {
+static pcount getConvertedMonomer() {
     int i, j;
 	pcount convertedMonomer = 0;
 
@@ -1882,7 +1886,7 @@ pcount getConvertedMonomer() {
 	return convertedMonomer;
 }
 
-void monomerAuditLocal(const char *str) {
+static void monomerAuditLocal(const char *str) {
 	if (!monomeraudit) {
 		return; // Do not perform
 	}
@@ -1916,18 +1920,18 @@ void monomerAuditLocal(const char *str) {
 
 /* Performs a+b=c for an array
  */
-INLINE void dvecAdd(pcount *c, pcount *a, pcount *b, unsigned n) {
+INLINE static void dvecAdd(pcount *c, pcount *a, pcount *b, unsigned n) {
 	for (size_t i = 0; i < n; i++) {
 			c[i] = a[i] + b[i];
 	}
 }
 
-INLINE int sizeExceeded(StatePacket *sp) {
+INLINE static int sizeExceeded(StatePacket *sp) {
     return(sp->stateTooBig);
 }
 
 
-void buildTreeFromLeaves(pcount *tree, pcount *leaves, int maxLeaves) {
+static void buildTreeFromLeaves(pcount *tree, pcount *leaves, int maxLeaves) {
 	//safety check
 	if (maxLeaves % 2 != 0) {
 		printf ("buildTreesFromLeaves had uneven leaves count\n");
@@ -1960,7 +1964,7 @@ void buildTreeFromLeaves(pcount *tree, pcount *leaves, int maxLeaves) {
  * species have chain length = 0. Returns bytes needed to store all
  * MWDs.
  */
-size_t getMaxChainLens(unsigned *max_len_arr_ptr) {
+static size_t getMaxChainLens(unsigned *max_len_arr_ptr) {
 	size_t bytesNeeded = 0, pos = 0;
 	
 	for (int i = 0; i < NO_OF_MOLSPECS; i++) {
@@ -2022,7 +2026,7 @@ size_t getMaxChainLens(unsigned *max_len_arr_ptr) {
 /*
  * Calculate number of bytes required for the header of the state packet
  */
-size_t stateCommHeaderBytes(void) {
+static size_t stateCommHeaderBytes(void) {
 
 	return (sizeof(StatePacket)
 		  + sizeof(pcount)*NO_OF_MOLSPECS // Mol counts
@@ -2030,7 +2034,7 @@ size_t stateCommHeaderBytes(void) {
           + sizeof(unsigned)*TOTAL_ARMS);  // Maximum chain lengths
 }
 
-size_t requiredStateCommSize(void) {
+static size_t requiredStateCommSize(void) {
 	// Allocate memory, get maxChainLens
 	unsigned *maxChainLens = malloc(sizeof(unsigned) * TOTAL_ARMS);
 	getMaxChainLens(maxChainLens);
@@ -2042,7 +2046,7 @@ size_t requiredStateCommSize(void) {
 	return stateCommHeaderBytes() + bytesForMWDs;
 }
 
-void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
+static void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 	file_write_debug("    Starting stateToComm() function");
 
 	// Packet format
@@ -2144,7 +2148,7 @@ void stateToComm(StatePacket **outStatePacket, StatePacket **inStatePacket) {
 	file_write_debug("    stateToComm() has finished");
 }
 
-int comparitorComplex(const void *m1_, const void *m2_) {
+static int comparitorComplex(const void *m1_, const void *m2_) {
 	chainLen *m1 = (chainLen*)m1_;
 	chainLen *m2 = (chainLen*)m2_;
 
@@ -2161,7 +2165,7 @@ int comparitorComplex(const void *m1_, const void *m2_) {
  * particles for each species is calculated from the final MWD in the case of
  * polymeric species.
  */
-void commToState(StatePacket **inStatePacket) {
+static void commToState(StatePacket **inStatePacket) {
 	file_write_debug("    Starting commToState() function");
 
 	RANK printf("commToState running...\n");
@@ -2347,7 +2351,7 @@ void commToState(StatePacket **inStatePacket) {
 	file_write_debug("    commToState() has finished");
 }
 
-void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
+static void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
 	for (unsigned i = 0; i < totalLength; i++) {
 		if (mwd[i] > state.localMonomerParticles)
 			printf("******************* %s: Bad data after stirring totalLen = %u\n", str, totalLength);
@@ -2357,7 +2361,7 @@ void checkMWDs(pcount *mwd, unsigned totalLength, char *str) {
 /* Combines the state information which has been sent. Cyber 
  * equivalent of stirring.
  */
-void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
+static void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
     StatePacket *in    = (StatePacket*)in_;
     StatePacket *inout = (StatePacket*)inout_;
 
@@ -2521,7 +2525,7 @@ void stirr(void *in_, void *inout_, int *len, MPI_Datatype *datatype) {
 	}
 }
 
-int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ) {
+static int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op, MPI_Comm comm ) {
 	file_write_debug("    Start MPI reduction (stirring)");
 	reduces++;
 	Timer t;
@@ -2538,7 +2542,7 @@ int MPI_Allreduce_wrapper(void *sendbuf, void *recvbuf, int count, MPI_Datatype 
 }
 
 /* Dump state content -- currently not functional yet (data likely needs to be serialized) */
-void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
+static void dumpStatePacket(StatePacket **inStatePacket, int stateCommSize) {
 
 	// Open the file
 	char fname[MAX_FILENAME_LEN] = "\0";
@@ -2633,7 +2637,7 @@ MU_TEST_SUITE(test_suite) {
 
 
 /*  Parse and apply command line options */
-void argumentParsing(int argc, char *argv[], unsigned *seed) {
+static void argumentParsing(int argc, const char *argv[], unsigned *seed) {
 	file_write_debug("Start parsing of command line arguments");
 
 	unsigned arg_seed = UINT_MAX;
@@ -2696,7 +2700,7 @@ void argumentParsing(int argc, char *argv[], unsigned *seed) {
 	file_write_debug("Parsing of command line arguments complete");
 }
 
-void compute(void) {
+static void compute(void) {
 	file_write_debug("Starting simulation");
 
 	RANK file_write_state(START);
