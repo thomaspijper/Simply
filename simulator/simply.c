@@ -145,7 +145,7 @@ static size_t rndCounter2 = PRNG_ARRAY_SIZE;
      randomProb(3) returns number in interval [0,1] -- currently (0,1)
      randomProb(4) forces all arrays to be recomputed
  */
-INLINE static double randomProb(int x) {
+INLINE double randomProb(int x) {
 	if ((x == 0)
 		|| (x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
 		if (rndCounter0 == PRNG_ARRAY_SIZE) {
