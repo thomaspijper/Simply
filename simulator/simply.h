@@ -37,8 +37,8 @@ typedef unsigned long long rcount; // stores a number of reaction events
 typedef unsigned chainLen;
 #define CHAINLENLIMIT UINT_MAX
 #else
-typedef short chainLen;
-#define CHAINLENLIMIT SHRT_MAX
+typedef unsigned short chainLen;
+#define CHAINLENLIMIT USHRT_MAX
 #endif
 
 typedef struct {
@@ -82,20 +82,17 @@ typedef struct {
 
 	ptime			time;
 	ptime			maxTime;
-	unsigned long long	nextSynchTime;	// In milliseconds. We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
-	unsigned long long	synchTime;		// In milliseconds. We cannot use a float type, since there is no guarantee that 0 can be represented exactly.
+	ptime			nextSynchTime;
+	unsigned long long	synchTime;		// In milliseconds. We do not use a float type, since there is no guarantee that 0 can be represented exactly.
 	Timer			wallTime;
 
 	rcount			events;
 	rcount			nextSynchEvents;
 	rcount			synchEvents;
 
-#ifdef CALCMOMENTSOFDIST
 	pcount			momentDist[3];
-#endif
-#ifdef CALCFREEVOLUME
+
 	double			freeVolumeFraction;
-#endif
 
 	float			conversion;
 

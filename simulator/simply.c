@@ -79,7 +79,7 @@ Changing this value will lead to different PRNs being generated. */
 #define PRNG_ARRAY_SIZE 1000
 
 // Verbose options
-#define VERBOSELEVEL 1
+#define VERBOSELEVEL 0
 #define NODEVERBOSELEVEL 1
 
 // Debugging options
@@ -412,7 +412,7 @@ static void dumpAllTrees() {
 	}
 }
 
-INLINE static void adjustTree(int spec_ind, mwdStore *mwd, int leave_ind, int diff) {
+INLINE static void adjustTree(const int spec_ind, mwdStore *mwd, int leave_ind, int diff) {
 	while (leave_ind >= mwd->maxEntries) {
 		printf("tree data structure overflow: %s leaveIx = %d maxEntries = %d\n", name(spec_ind),leave_ind, mwd->maxEntries);
 		double_arraysize(&(mwd->mwd_tree), (size_t)mwd->maxEntries);
@@ -431,7 +431,7 @@ INLINE static void adjustTree(int spec_ind, mwdStore *mwd, int leave_ind, int di
 /* Add 'diff' molecules of chain length (leave_ind + 1) of type
    spec_ind into tree. Increase tree size if necessary.
  */
-INLINE static void adjustMolCnt(int spec_ind, chainLen *lengths, int arms, int diff) {
+INLINE static void adjustMolCnt(const int spec_ind, chainLen *lengths, int arms, int diff) {
 	if (spec_ind < MAXPOLY) {
 		adjustTree(spec_ind, &state.mwds[spec_ind][0], lengths[0]-1, diff);
 	}
@@ -558,7 +558,7 @@ static void mergeMWDs(void) {
 }
 
 /* For O(1) algorithm, uses large amounts of memory */
-INLINE static void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms, int diff) {
+INLINE static void adjustMolCnt_order1(const int spec_ind, chainLen *lengths, int arms) {
 	pcount molecules = state.ms_cnts[spec_ind];
 
 	if (molecules > state.expMols[spec_ind].maxMolecules) {
@@ -570,7 +570,7 @@ INLINE static void adjustMolCnt_order1(int spec_ind, chainLen *lengths, int arms
 		free(old);
 	}
 	chainLen *mempos = state.expMols[spec_ind].mols + (molecules-1)*arms;
-	for (int i=0; i<arms; i++) {
+	for (int i = 0; i < arms; i++) {
 		mempos[i] = lengths[i];
 	}
 }
@@ -958,7 +958,7 @@ static void initSysState(unsigned seed) {
 
     /* time, rate, particles, events, conversion, temperatures, etc. */
     state.time = 0.0;
-	state.nextSynchTime = state.synchTime;
+	state.nextSynchTime = (ptime)(state.synchTime / 1000);
 	state.events = 0;
 	state.noMoreReactions = 0;
 	state.noMoreReactionsLocal = 0;
@@ -1064,10 +1064,9 @@ INLINE static int pickRndChainLen(pcount *mwd_tree, int size) {
 
 /*
  *  Pick a random molecule which matches the spec and delete it from
- *  system. Returns: length of molecule picked.
- * From CodeGen polysim.c.
+ *  system.
  */
-static int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
+static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 
 	if (DEBUGLEVEL >= 2) {
 		assert(state.ms_cnts[spec_index] > 0);
@@ -1125,7 +1124,7 @@ static int pickRndMolecule(int spec_index, chainLen *lens, int *arms) {
 	return 0;
 }
 
-static int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
+static int pickRndMolecule_order1(const int spec_index, chainLen *lens, int *arms) {
 
 	if (DEBUGLEVEL >= 2) {
 		assert(state.ms_cnts[spec_index] > 0);
@@ -1145,9 +1144,9 @@ static int pickRndMolecule_order1(int spec_index, chainLen *lens, int *arms) {
 	else {
 		*arms = state.arms[spec_index];
 		pcount lastIx = state.ms_cnts[spec_index]-1;
-		pcount rndIx = (pcount)((double)randomProb(3)*(double)lastIx + 0.5); // Fast rounding by adding 0.5, then casting to int
+		pcount rndIx = (pcount)(randomProb(3) * (double)lastIx + 0.5); // Fast rounding by adding 0.5, then casting to int
 		chainLen *pickedPos = &state.expMols[spec_index].mols[rndIx*(*arms)];
-		size_t memSize = (*arms)*sizeof(chainLen);
+		size_t memSize = (*arms) * sizeof(chainLen);
 		memcpy(lens, pickedPos, memSize);
 
 		if (rndIx != lastIx) {
@@ -1255,6 +1254,7 @@ static void react(void) {
 	int				react1_arms = 1, react2_arms = 1, prod1_arms = 1, prod2_arms = 1;
 	int				prod1_ind, prod2_ind;
 	chainLen		prod1_lens[MAX_ARMS], prod2_lens[MAX_ARMS];
+	chainLen		comb_len;
 
 	int				no_of_res;
 
@@ -1326,7 +1326,7 @@ static void react(void) {
 		state.ms_cnts[prod1_ind]++;
 		if (prod1_ind >= MAXSIMPLE) {
 			if (explicit) {
-				adjustMolCnt_order1(prod1_ind, prod1_lens, prod1_arms, 1);
+				adjustMolCnt_order1(prod1_ind, prod1_lens, prod1_arms);
 			}
 			else {
 				adjustMolCnt(prod1_ind, prod1_lens, prod1_arms, 1);
@@ -1340,7 +1340,7 @@ static void react(void) {
 			state.ms_cnts[prod2_ind]++;
 			if (prod2_ind >= MAXSIMPLE) {
 				if (explicit) {
-					adjustMolCnt_order1(prod2_ind, prod2_lens, prod2_arms, 1);
+					adjustMolCnt_order1(prod2_ind, prod2_lens, prod2_arms);
 				}
 				else {
 					adjustMolCnt(prod2_ind, prod2_lens, prod2_arms, 1);
@@ -1348,7 +1348,7 @@ static void react(void) {
 			}
 		}
 
-		// Integer overflow protection
+		// Integer overflow protection (currently detects overflow on propagation, not combination)
 		if ((prod1_lens[0] == CHAINLENLIMIT) ||
 			(prod2_lens[0] == CHAINLENLIMIT)) {
 			printf("\nError: a particle of species %s on node %d has reached its maximum chain length.\nWriting data and exiting...\n\n", name(prod1_ind), myid);
@@ -1365,12 +1365,12 @@ static void react(void) {
 					state.momentDist[2] -= react1_lens[0] * react1_lens[0];
 				}
 				else {
-					int totalLength = 0;
+					comb_len = 0;
 					for (int arm = 0; arm < react1_arms; arm++) {
-						totalLength += react1_lens[arm];
+						comb_len += react1_lens[arm];
 					}
-					state.momentDist[1] -= totalLength;
-					state.momentDist[2] -= totalLength * totalLength;
+					state.momentDist[1] -= comb_len;
+					state.momentDist[2] -= comb_len * comb_len;
 				}
 				// Adjust moments for disappearance reactant 2
 			}
@@ -1381,12 +1381,12 @@ static void react(void) {
 					state.momentDist[2] -= react2_lens[0] * react2_lens[0];
 				}
 				else {
-					int totalLength = 0;
+					comb_len = 0;
 					for (int arm = 0; arm < react2_arms; arm++) {
-						totalLength += react2_lens[arm];
+						comb_len += react2_lens[arm];
 					}
-					state.momentDist[1] -= totalLength;
-					state.momentDist[2] -= totalLength * totalLength;
+					state.momentDist[1] -= comb_len;
+					state.momentDist[2] -= comb_len * comb_len;
 				}
 			}
 			// Adjust moments for appearance product  1
@@ -1397,11 +1397,11 @@ static void react(void) {
 					state.momentDist[2] += prod1_lens[0] * prod1_lens[0];
 				}
 				else {
-					int totalLength = 0;
+					comb_len = 0;
 					for (int arm = 0; arm < prod1_arms; arm++) {
-						totalLength += prod1_lens[arm];
-						state.momentDist[1] += totalLength;
-						state.momentDist[2] += totalLength * totalLength;
+						comb_len += prod1_lens[arm];
+						state.momentDist[1] += comb_len;
+						state.momentDist[2] += comb_len * comb_len;
 					}
 				}
 				// Adjust moments for appearance product 2
@@ -1413,11 +1413,11 @@ static void react(void) {
 					state.momentDist[2] += prod2_lens[0] * prod2_lens[0];
 				}
 				else {
-					int totalLength = 0;
+					comb_len = 0;
 					for (int arm = 0; arm < prod2_arms; arm++) {
-						totalLength += prod2_lens[arm];
-						state.momentDist[1] += totalLength;
-						state.momentDist[2] += totalLength * totalLength;
+						comb_len += prod2_lens[arm];
+						state.momentDist[1] += comb_len;
+						state.momentDist[2] += comb_len * comb_len;
 					}
 				}
 			}
@@ -1443,7 +1443,7 @@ static void react(void) {
 		deltatime = (-log(rndtime)) / rate;
 		state.time += deltatime;
 
-		if (COOLINGRATE != 0) { // is integer 0 when cooling is disabled
+		if (COOLINGRATE != 0) {
 			state.deltatemp *= exp(-1 * coolingrate * deltatime);
 			state.temp = state.basetemp + state.deltatemp;
 		}
@@ -1457,7 +1457,7 @@ static void react(void) {
 		}
 
 		state.events++;
-	} while (((state.time < ((ptime)state.nextSynchTime) / 1000) || (state.synchTime == 0)) 
+	} while (((state.time < state.nextSynchTime) || (state.synchTime == 0)) 
 		    &&
 		    ((state.events < state.nextSynchEvents) || (state.synchEvents == 0)));
 
@@ -2260,7 +2260,7 @@ static void commToState(StatePacket **inStatePacket) {
 				for (pcount c = start; c < end; c++) {
 					chainLen *mol = list + state.arms[i] * c;
 					state.ms_cnts[i]++;
-					adjustMolCnt_order1(i, mol, state.arms[i], 1);
+					adjustMolCnt_order1(i, mol, state.arms[i]);
 				}
 
 				mwd = (pcount*)((char*)mwd + sizeof(chainLen) * maxChainLens[pos] * state.arms[i]);
@@ -2831,7 +2831,7 @@ static void compute(void) {
 		state_summary(POSTSTIRR);
 		RANK file_write_state(PROFILES);
 
-		state.nextSynchTime += state.synchTime;
+		state.nextSynchTime += (ptime)(state.synchTime / 1000);
 		state.nextSynchEvents += (rcount)((float)state.synchEvents/(float)numprocs);
     }
 	file_write_debug("Simulation complete");
