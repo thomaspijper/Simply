@@ -129,25 +129,28 @@ INLINE static pcount min_value(pcount x, pcount y) {
 
 // Variables needed for pseudorandom number generation
 static w128_t dummy0[PRNG_ARRAY_SIZE / 2 + 1];
-static w128_t dummy1[PRNG_ARRAY_SIZE / 2 + 1];
-static w128_t dummy2[PRNG_ARRAY_SIZE / 2 + 1];
 static double *rndArray0 = (double *)dummy0;
-static double *rndArray1 = (double *)dummy1;
-static double *rndArray2 = (double *)dummy2;
 static size_t rndCounter0 = PRNG_ARRAY_SIZE;
-static size_t rndCounter1 = PRNG_ARRAY_SIZE;
+//static w128_t dummy1[PRNG_ARRAY_SIZE / 2 + 1];
+//static double *rndArray1 = (double *)dummy1;
+//static size_t rndCounter1 = PRNG_ARRAY_SIZE;
+static w128_t dummy2[PRNG_ARRAY_SIZE / 2 + 1];
+static double *rndArray2 = (double *)dummy2;
 static size_t rndCounter2 = PRNG_ARRAY_SIZE;
+static w128_t logDummy2[PRNG_ARRAY_SIZE / 2 + 1];
+static double *logRndArray2 = (double *)logDummy2;
+static size_t logRndCounter2 = PRNG_ARRAY_SIZE;
 
 /* Returns a pseudorandom number.
      randomProb(0) returns number in interval (0,1)
-     randomProb(1) returns number in interval [0,1)
+     randomProb(1) returns number in interval [0,1) (disabled)
      randomProb(2) returns number in interval (0,1]
      randomProb(3) returns number in interval [0,1] -- currently (0,1)
      randomProb(4) forces all arrays to be recomputed
  */
 INLINE static double randomProb(int x) {
-	if ((x == 0)
-		|| (x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
+	if ((x == 0) || 
+		(x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
 		if (rndCounter0 == PRNG_ARRAY_SIZE) {
 			dsfmt_gv_fill_array_open_open(rndArray0, PRNG_ARRAY_SIZE); // interval (0,1)
 			rndCounter0 = 0;
@@ -156,7 +159,7 @@ INLINE static double randomProb(int x) {
 		rndCounter0 += 1;
 		return rnd;
 	}
-	else if (x == 1) {
+	/*else if (x == 1) {
 		if (rndCounter1 == PRNG_ARRAY_SIZE) {
 			dsfmt_gv_fill_array_close_open(rndArray1, PRNG_ARRAY_SIZE); // interval [0,1)
 			rndCounter1 = 0;
@@ -164,7 +167,7 @@ INLINE static double randomProb(int x) {
 		double rnd = rndArray1[rndCounter1];
 		rndCounter1 += 1;
 		return rnd;
-	}
+	}*/
 	else if (x == 2) {
 		if (rndCounter2 == PRNG_ARRAY_SIZE) {
 			dsfmt_gv_fill_array_open_close(rndArray2, PRNG_ARRAY_SIZE); // interval (0,1]
@@ -176,7 +179,7 @@ INLINE static double randomProb(int x) {
 	}
 	else if (x == 4) { // Force array to be recalculated
 		rndCounter0 = PRNG_ARRAY_SIZE;
-		rndCounter1 = PRNG_ARRAY_SIZE;
+		//rndCounter1 = PRNG_ARRAY_SIZE;
 		rndCounter2 = PRNG_ARRAY_SIZE;
 		return 0;
 	}
@@ -184,6 +187,22 @@ INLINE static double randomProb(int x) {
 		printf("You've reached an unavailable option for randomProb. Exiting...\n");
 		exit(EXIT_FAILURE);
 	}
+}
+
+/* Produces an array of PRNs on the interval (0,1), then takes the natural logarithm of each.
+*  Used for time evolution. Allows for loop vectorization (Visual Studio).
+*/
+INLINE static double logRndArray(void) {
+	if (logRndCounter2 == PRNG_ARRAY_SIZE) {
+		dsfmt_gv_fill_array_open_open(logRndArray2, PRNG_ARRAY_SIZE); // interval (0,1)
+		logRndCounter2 = 0;
+		for (int i = 0; i < PRNG_ARRAY_SIZE; i++) {
+			logRndArray2[i] = log(logRndArray2[i]);
+		}
+	}
+	double logRnd = logRndArray2[logRndCounter2];
+	logRndCounter2 += 1;
+	return logRnd;
 }
 
 /* Makes each process take the correct number of particles, ensuring conservation of
@@ -1038,7 +1057,7 @@ INLINE static int pickRndChainLen(pcount *mwd_tree, int size) {
 	int             length;
 	int             curr = 1;
 
-	prob =  randomProb(3);  
+	prob = randomProb(3);  
 	prob *= mwd_tree[0];
 
 	mwd_tree[0]--;
@@ -1433,14 +1452,12 @@ static void react(void) {
 			state.temp = state.basetemp + state.deltatemp;
 		}
 
-		probability     rndtime;
 		probability     rate;
 		ptime			deltatime;
 
-		rndtime = randomProb(2);
 		rate = state.reactProbTree[0];
 
-		deltatime = (-log(rndtime)) / rate;
+		deltatime = (-logRndArray()) / rate;
 		state.time += deltatime;
 
 		if (COOLINGRATE != 0) {
@@ -2597,11 +2614,6 @@ MU_TEST(dSFMT_test) {
 	// Test path 0
 	dsfmt_gv_init_gen_rand(1);
 	mu_assert_double_eq(0.1193544251137, randomProb(0));
-	randomProb(4);
-
-	// Test path 1
-	dsfmt_gv_init_gen_rand(1);
-	mu_assert_double_eq(0.1193544251137, randomProb(1));
 	randomProb(4);
 
 	// Test path 2

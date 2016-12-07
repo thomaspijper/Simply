@@ -7,7 +7,7 @@ CC = "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\cl.exe"
 LINK = "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\amd64\link.exe"
 
 
-CFLAGS = /c /I $(MPI) /I $(MPI_x64) /Zi /nologo /W1 /WX- /O2 /Oi /Ob1 /Ot /Oy /Gm- /EHsc /MT /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo /Gd
+CFLAGS = /c /I $(MPI) /I $(MPI_x64) /Zi /nologo /W1 /WX- /O2 /Oi /Ob1 /Ot /Oy /Gm- /EHsc /MT /GS /fp:precise /Zc:wchar_t /Zc:forScope /Zc:inline /Fo /Gd /arch:AVX2
 LFLAGS= /OUT:"simply.exe" /INCREMENTAL:NO /NOLOGO $(MPIlib) /MANIFEST:EMBED /DEBUG /PDB:"simply.PDB" /IMPLIB:"simply.LIB" /MACHINE:X64
 
 all: argparse.obj dSFMT.obj simply.obj simply.exe
