@@ -453,10 +453,26 @@ INLINE static void adjustTree(const int spec_ind, mwdStore *mwd, int leave_ind, 
 INLINE static void adjustMolCnt(const int spec_ind, chainLen *lengths, int arms, int diff) {
 	if (spec_ind < MAXPOLY) {
 		adjustTree(spec_ind, &state.mwds[spec_ind][0], lengths[0]-1, diff);
+		if (calcmoments) {
+			// Adjust moments of distribution for appearance product
+			state.momentDist[0]++;
+			state.momentDist[1] += lengths[0];
+			state.momentDist[2] += lengths[0] * lengths[0];
+		}
 	}
 	else {
-		for (int a=0; a<arms; a++) {
-			adjustTree(spec_ind, &state.mwds[spec_ind][a], lengths[a]-1, diff);
+		chainLen comb_length = 0;
+		for (int a = 0; a < arms; a++) {
+			adjustTree(spec_ind, &state.mwds[spec_ind][a], lengths[a] - 1, diff);
+			if (calcmoments) {
+				comb_length += lengths[a];
+			}
+		}
+		if (calcmoments) {
+			// Adjust moments of distribution for appearance product
+			state.momentDist[0]++;
+			state.momentDist[1] += comb_length;
+			state.momentDist[2] += comb_length * comb_length;
 		}
 	}
 }
@@ -589,8 +605,18 @@ INLINE static void adjustMolCnt_order1(const int spec_ind, chainLen *lengths, in
 		free(old);
 	}
 	chainLen *mempos = state.expMols[spec_ind].mols + (molecules-1)*arms;
+	chainLen comb_length = 0;
 	for (int i = 0; i < arms; i++) {
 		mempos[i] = lengths[i];
+		if (calcmoments) {
+			comb_length += mempos[i];
+		}
+	}
+	if (calcmoments) {
+		// Adjust moments of distribution for appearance product
+		state.momentDist[0]++;
+		state.momentDist[1] += comb_length;
+		state.momentDist[2] += comb_length * comb_length;
 	}
 }
 
@@ -1098,8 +1124,7 @@ static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 	}
 
     /* decrement global and spec local count */
-	if (state.ms_cnts[spec_index] > 0)
-	    state.ms_cnts[spec_index]--;
+	state.ms_cnts[spec_index]--;
 
     /* simple molecule, we're done */
     if (spec_index < MAXSIMPLE) {
@@ -1111,6 +1136,14 @@ static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 		pcount *mwd_tree = state.mwds[spec_index][0].mwd_tree;
 		int size = state.mwds[spec_index][0].maxEntries;
 		lens[0] = pickRndChainLen(mwd_tree, size);
+
+		if (calcmoments) {
+			// Adjust moments of distribution for disappearance reactant
+			state.momentDist[0]--;
+			state.momentDist[1] -= lens[0];
+			state.momentDist[2] -= lens[0] * lens[0];
+		}
+
 		if (DEBUGLEVEL >= 2) {
 			if (lens[0] < 0) {
 				printf("error: chain length < 0 for species %s(arm=0)\n", name(spec_index));
@@ -1119,16 +1152,15 @@ static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 				abort();
 			}
 		}
-
 	}
 	else {
-
 		/* Complex species: pick several chain lengths according to MWD */
 		*arms = state.arms[spec_index];
 		for (int a = 0; a < *arms; a++) {
 			pcount *mwd_tree = state.mwds[spec_index][a].mwd_tree;
 			int size = state.mwds[spec_index][a].maxEntries;
 			lens[a] = pickRndChainLen(mwd_tree, size);
+
 			if (DEBUGLEVEL >= 2) {
 				if (lens[a] < 0) {
 					printf("error: chain length < 0 for species %s(arm=%d)\n", name(spec_index), a);
@@ -1138,6 +1170,16 @@ static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 				}
 			}
 		}
+		if (calcmoments) {
+			// Adjust moments of distribution for disappearance reactant
+			state.momentDist[0]--;
+			chainLen comb_len = 0;
+			for (int a = 0; a < *arms; a++) {
+				comb_len += lens[a];
+			}
+			state.momentDist[1] -= comb_len;
+			state.momentDist[2] -= comb_len * comb_len;
+		}
 	}
 
 	return 0;
@@ -1146,7 +1188,6 @@ static int pickRndMolecule(const int spec_index, chainLen *lens, int *arms) {
 static int pickRndMolecule_order1(const int spec_index, chainLen *lens, int *arms) {
 
 	if (DEBUGLEVEL >= 2) {
-		assert(state.ms_cnts[spec_index] > 0);
 		if (state.ms_cnts[spec_index] <= 0) {
 			printf("Trying to pick %s when there are none\n", name(spec_index));
 			print_state();
@@ -1174,6 +1215,23 @@ static int pickRndMolecule_order1(const int spec_index, chainLen *lens, int *arm
 
 	    /* decrement global and spec local count */
 	    state.ms_cnts[spec_index]--;
+
+		if (calcmoments) {
+			// Adjust moments of distribution for disappearance reactant
+			state.momentDist[0]--;
+			if (spec_index < MAXPOLY) {
+				state.momentDist[1] -= (*lens);
+				state.momentDist[2] -= (*lens) * (*lens);
+			}
+			else {
+				chainLen comb_len = 0;
+				for (int a = 0; a < (*arms); a++) {
+					comb_len += lens[a];
+				}
+				state.momentDist[1] -= comb_len;
+				state.momentDist[2] -= comb_len * comb_len;
+			}
+		}
 		return 0;
 	}
 }
@@ -1273,7 +1331,6 @@ static void react(void) {
 	int				react1_arms = 1, react2_arms = 1, prod1_arms = 1, prod2_arms = 1;
 	int				prod1_ind, prod2_ind;
 	chainLen		prod1_lens[MAX_ARMS], prod2_lens[MAX_ARMS];
-	chainLen		comb_len;
 
 	int				no_of_res;
 
@@ -1373,73 +1430,6 @@ static void react(void) {
 			printf("\nError: a particle of species %s on node %d has reached its maximum chain length.\nWriting data and exiting...\n\n", name(prod1_ind), myid);
 			printf("\nNode %d exited with errors\n", myid);
 			exit(EXIT_FAILURE);
-		}
-
-		if (calcmoments) {
-			// Adjust moments for disappearance reactant 1
-			if (react1_ind >= MAXSIMPLE) {
-				state.momentDist[0] -= 1;
-				if (react1_ind < MAXPOLY) {
-					state.momentDist[1] -= react1_lens[0];
-					state.momentDist[2] -= react1_lens[0] * react1_lens[0];
-				}
-				else {
-					comb_len = 0;
-					for (int arm = 0; arm < react1_arms; arm++) {
-						comb_len += react1_lens[arm];
-					}
-					state.momentDist[1] -= comb_len;
-					state.momentDist[2] -= comb_len * comb_len;
-				}
-				// Adjust moments for disappearance reactant 2
-			}
-			if (react2_ind >= MAXSIMPLE) {
-				state.momentDist[0] -= 1;
-				if (react2_ind < MAXPOLY) {
-					state.momentDist[1] -= react2_lens[0];
-					state.momentDist[2] -= react2_lens[0] * react2_lens[0];
-				}
-				else {
-					comb_len = 0;
-					for (int arm = 0; arm < react2_arms; arm++) {
-						comb_len += react2_lens[arm];
-					}
-					state.momentDist[1] -= comb_len;
-					state.momentDist[2] -= comb_len * comb_len;
-				}
-			}
-			// Adjust moments for appearance product  1
-			if (prod1_ind >= MAXSIMPLE) {
-				state.momentDist[0] += 1;
-				if (prod1_ind < MAXPOLY) {
-					state.momentDist[1] += prod1_lens[0];
-					state.momentDist[2] += prod1_lens[0] * prod1_lens[0];
-				}
-				else {
-					comb_len = 0;
-					for (int arm = 0; arm < prod1_arms; arm++) {
-						comb_len += prod1_lens[arm];
-						state.momentDist[1] += comb_len;
-						state.momentDist[2] += comb_len * comb_len;
-					}
-				}
-				// Adjust moments for appearance product 2
-			}
-			if (prod2_ind >= MAXSIMPLE) {
-				state.momentDist[0] += 1;
-				if (prod2_ind < MAXPOLY) {
-					state.momentDist[1] += prod2_lens[0];
-					state.momentDist[2] += prod2_lens[0] * prod2_lens[0];
-				}
-				else {
-					comb_len = 0;
-					for (int arm = 0; arm < prod2_arms; arm++) {
-						comb_len += prod2_lens[arm];
-						state.momentDist[1] += comb_len;
-						state.momentDist[2] += comb_len * comb_len;
-					}
-				}
-			}
 		}
 
 		if (recalcconversion) {
@@ -1871,7 +1861,7 @@ static void print_kinetic_model(void) {
 	}
 }
 
-static pcount getConvertedMonomer() {
+static pcount getConvertedMonomer(void) {
     int i, j;
 	pcount convertedMonomer = 0;
 
@@ -2815,6 +2805,7 @@ static void compute(void) {
 			state.freeVolumeFraction = (VF0 + ALPHA_P * (state.temp - TG_P)) * state.conversion + (VF0 + ALPHA_M * (state.temp - TG_M)) * (1 - state.conversion);
 		}
 		if (calcmoments) {
+			// CURRENTLY ONLY FUNCTIONAL WITH EXPLICIT STATE!
 			state.momentDist[0] = 1;
 			state.momentDist[1] = 1;
 			state.momentDist[2] = 1;
