@@ -2862,10 +2862,10 @@ int main(int argc, char *argv[]) {
 	w128_t dummy0 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1)*sizeof(w128_t));
 	w128_t dummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
 	w128_t logDummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
-#elif defined (_MSC_VER)
-	w128_t *dummy0 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
-	w128_t *dummy2 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
-	w128_t *logDummy2 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
+#elif defined (_MSC_VER) // MSVC automatically aligns _m128* types on 16-byte boundaries
+	w128_t *dummy0 = malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+	w128_t *dummy2 = malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+	w128_t *logDummy2 = malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
 #endif
 	rndArray0 = (double *)dummy0;
 	rndArray2 = (double *)dummy2;
