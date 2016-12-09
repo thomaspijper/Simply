@@ -45,6 +45,7 @@
 #include <math.h>
 #include <assert.h>
 #include <limits.h>
+#include <malloc.h>
 
 // MPI header
 #if defined(__GNUC__)
@@ -76,7 +77,7 @@
 /* The number of PRNs to generate at a time.
 Should not be smaller than 382 and must be an even number.
 Changing this value will lead to different PRNs being generated. */
-#define PRNG_ARRAY_SIZE 1000
+#define PRNG_ARRAY_SIZE 10000
 
 // Verbose options
 #define VERBOSELEVEL 0
@@ -108,6 +109,9 @@ size_t stateCommSize;
 static char dirname[MAX_FILENAME_LEN] = "\0";
 static char simname[MAX_FILENAME_LEN] = "\0";
 static char hostname[MAX_HOSTNAME_LEN] = "\0";
+static double *rndArray0;
+static double *rndArray2;
+static double *logRndArray2;
 
 // Initialize options
 static const _Bool monomeraudit = MONO_AUDIT;
@@ -127,20 +131,6 @@ INLINE static pcount min_value(pcount x, pcount y) {
 	return (x > y ? y : x);
 }
 
-// Variables needed for pseudorandom number generation
-static w128_t dummy0[PRNG_ARRAY_SIZE / 2 + 1];
-static double *rndArray0 = (double *)dummy0;
-static size_t rndCounter0 = PRNG_ARRAY_SIZE;
-//static w128_t dummy1[PRNG_ARRAY_SIZE / 2 + 1];
-//static double *rndArray1 = (double *)dummy1;
-//static size_t rndCounter1 = PRNG_ARRAY_SIZE;
-static w128_t dummy2[PRNG_ARRAY_SIZE / 2 + 1];
-static double *rndArray2 = (double *)dummy2;
-static size_t rndCounter2 = PRNG_ARRAY_SIZE;
-static w128_t logDummy2[PRNG_ARRAY_SIZE / 2 + 1];
-static double *logRndArray2 = (double *)logDummy2;
-static size_t logRndCounter2 = PRNG_ARRAY_SIZE;
-
 /* Returns a pseudorandom number.
      randomProb(0) returns number in interval (0,1)
      randomProb(1) returns number in interval [0,1) (disabled)
@@ -149,6 +139,8 @@ static size_t logRndCounter2 = PRNG_ARRAY_SIZE;
      randomProb(4) forces all arrays to be recomputed
  */
 INLINE static double randomProb(int x) {
+	static size_t rndCounter0 = PRNG_ARRAY_SIZE;
+	static size_t rndCounter2 = PRNG_ARRAY_SIZE;
 	if ((x == 0) || 
 		(x == 3)) { // interval [0,1] is not available with dSFMT.h, so we use (0,1) instead
 		if (rndCounter0 == PRNG_ARRAY_SIZE) {
@@ -193,6 +185,7 @@ INLINE static double randomProb(int x) {
 *  Used for time evolution. Allows for loop vectorization (Visual Studio).
 */
 INLINE static double logRndArray(void) {
+	static size_t logRndCounter2 = PRNG_ARRAY_SIZE;
 	if (logRndCounter2 == PRNG_ARRAY_SIZE) {
 		dsfmt_gv_fill_array_open_open(logRndArray2, PRNG_ARRAY_SIZE); // interval (0,1)
 		logRndCounter2 = 0;
@@ -2863,6 +2856,20 @@ int main(int argc, char *argv[]) {
 	}
 	file_write_debug("");
 	file_write_debug("Simply started");
+
+	// Define arrays for PRNG
+#if defined(__GNUC__)
+	w128_t dummy0 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1)*sizeof(w128_t));
+	w128_t dummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+	w128_t logDummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+#elif defined (_MSC_VER)
+	w128_t *dummy0 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
+	w128_t *dummy2 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
+	w128_t *logDummy2 = _aligned_malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t), 16);
+#endif
+	rndArray0 = (double *)dummy0;
+	rndArray2 = (double *)dummy2;
+	logRndArray2 = (double *)logDummy2;
 
 	// Unit testing
 	RANK {
