@@ -67,7 +67,6 @@ extern "C" {
 #include <assert.h>
 
 #define DSFMT_MEXP 19937
-#define HAVE_SSE2
 
 /*-----------------
   BASIC DEFINITIONS

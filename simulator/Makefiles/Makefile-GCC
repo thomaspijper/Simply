@@ -1,6 +1,6 @@
 RM = rm -f
 CC = mpicc
-CFLAGS = -std=c99 -Wall -O3 -fomit-frame-pointer -ffast-math -march=native
+CFLAGS = -std=c99 -Wall -O3 -fomit-frame-pointer -ffast-math -march=native -DHAVE_SSE2
 LDFLAGS = -lm -lrt
 
 simply: simply.c simply.o dSFMT.o argparse.o genpolymer.h simply.h minunit.h Makefile
