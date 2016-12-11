@@ -2574,21 +2574,33 @@ MU_TEST(dSFMT_test) {
 	mu_assert(PRNG_ARRAY_SIZE >= DSFMT_N64, errormsg);
 	mu_assert((PRNG_ARRAY_SIZE % 2) == 0, "PRNG_ARRAY_SIZE must be an even number");
 
-	// 1) Seed the PRNG, 2) test the value, 3) empty the PRNG arrays
+	// 1) Seed the PRNG, 2) test five consecutive values, 3) empty the PRNG arrays
 	// Test path 0
 	dsfmt_gv_init_gen_rand(1);
 	mu_assert_double_eq(0.1193544251137, randomProb(0));
+	mu_assert_double_eq(0.9124176151803, randomProb(0));
+	mu_assert_double_eq(0.5031786702429, randomProb(0));
+	mu_assert_double_eq(0.8712546575055, randomProb(0));
+	mu_assert_double_eq(0.5324328025691, randomProb(0));
 	randomProb(4);
 
 	// Test path 2
 	dsfmt_gv_init_gen_rand(1);
 	mu_assert_double_eq(0.8806455748863, randomProb(2));
+	mu_assert_double_eq(0.0875823848197, randomProb(2));
+	mu_assert_double_eq(0.4968213297571, randomProb(2));
+	mu_assert_double_eq(0.1287453424945, randomProb(2));
+	mu_assert_double_eq(0.4675671974309, randomProb(2));
 	randomProb(4);
 
-	// Test path 3
-	dsfmt_gv_init_gen_rand(1);
-	mu_assert_double_eq(0.1193544251137, randomProb(3));
-	randomProb(4);
+	// Test path 3 -- currently same as path 0
+	/*dsfmt_gv_init_gen_rand(1);
+	mu_assert_double_eq(0.1193544251137, randomProb(0));
+	mu_assert_double_eq(0.9124176151803, randomProb(0));
+	mu_assert_double_eq(0.5031786702429, randomProb(0));
+	mu_assert_double_eq(0.8712546575055, randomProb(0));
+	mu_assert_double_eq(0.5324328025691, randomProb(0));
+	randomProb(4);*/
 }
 
 /*  Test whether START_MWD_SIZE is a power of two */
