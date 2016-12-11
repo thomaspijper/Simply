@@ -123,6 +123,11 @@ static const _Bool recalcconversion = RECALCCONVERSION;
 static const _Bool calcfreevolume = CALCFREEVOLUME;
 static const double coolingrate = COOLINGRATE;
 
+// Forced inlines
+FORCEINLINE_PRE static void updateTree(int prevReact) FORCEINLINE_POST;
+FORCEINLINE_PRE static int pickRndReaction() FORCEINLINE_POST;
+//FORCEINLINE_PRE static int pickRndChainLen(pcount *mwd_tree, int size) FORCEINLINE_POST;
+
 INLINE static pcount max_value(pcount x, pcount y) {
 	return (x < y ? y : x);
 }
@@ -649,14 +654,6 @@ static void dumpReactProbTree() {
 	printf("\n\n");
 }
 
-
-#if defined(_MSC_VER)
-__forceinline static void updateTree(int prevReact);
-#elif defined(__GNUC__)
-inline static void updateTree (int prevReact) __attribute__((always_inline));
-#endif
-
-
 INLINE static void updateTree(int prevReact) {
 	RATES_UPDATE_BODY
 	if (simulateheating) { // Use of TREE_UPDATE_BODY currently isn't sufficient, so we'll update the entire tree (fast and simple)
@@ -924,14 +921,6 @@ static void file_write_debug(const char *str) {
 * This would probably pay off for systems with a higher number
 * of reactions.
 */
-
-#if defined(_MSC_VER)
-__forceinline static int pickRndReaction();
-#elif defined(__GNUC__)
-inline static int pickRndReaction() __attribute__((always_inline));
-#endif
-
-
 INLINE static int pickRndReaction() {
     probability	rate;
     int			i;
@@ -1060,14 +1049,6 @@ static void initSysState(unsigned seed) {
 
 	file_write_debug("Initialization of the simulation complete");
 }
-
-/*
-#if defined(_MSC_VER)
-__forceinline int pickRndChainLen(pcount *mwd_tree, int size);
-#elif defined(__GNUC__)
-inline int pickRndChainLen(pcount *mwd_tree, int size) __attribute__((always_inline));
-#endif
-*/
 
 INLINE static int pickRndChainLen(pcount *mwd_tree, int size) {
 

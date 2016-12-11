@@ -21,11 +21,15 @@
 #include <sys/time.h>
 #endif
 
- // Define inline directive for MSVC and GCC
+// Define inline directives
 #if defined(_MSC_VER)
   #define INLINE __inline
+  #define FORCEINLINE_PRE __forceinline
+  #define FORCEINLINE_POST
 #elif defined(__GNUC__)
   #define INLINE inline
+  #define FORCEINLINE_PRE inline
+  #define FORCEINLINE_POST __attribute__((always_inline))
 #endif
 
 #define MAX_DATA_FILE 1000
