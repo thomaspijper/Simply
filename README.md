@@ -4,7 +4,7 @@ _Current version is 0.98 alpha, released on 2016-06-06 ([download this version](
 
 Simply is a kinetic Monte Carlo simulator for polymerization reactions. It is based on _paraPolySim_ by Barner-Kowollik and coworkers and consists of two separate programs. The first (‘generator’) is Python program that interprets the user-provided input file and translates it into a C header file. The second (‘simulator’) is the actual simulation engine, written in C. The C code, when combined with the generated header file, compiles into an executable that is highly optimized for the system that is to be simulated.
 
-One important goal of the program is to maximize computational efficiency, which is achieved through a) detailed knowledge of the simulation being available at compile time, b) an efficient parallelization scheme (which utilizes MPI), c) a minimalistic code path, and d) support for SSE2 and AVX2 SIMD instructions.
+One important goal of the program is to maximize computational efficiency, which is achieved through a) detailed knowledge of the simulation being available at compile time, b) an efficient parallelization scheme (which utilizes MPI), c) a minimalistic code path, and d) support for SSE2/AVX/AVX2 SIMD instructions.
 
 Simply can run on Linux and Windows.
 
@@ -13,7 +13,7 @@ Simply can run on Linux and Windows.
 The simulation capabilities of Simply are as follows:
 * simulation of various types reactions between singles molecules (incl. monomeric species), polymers, and multi-chain polymer complexes;
 * simulation of various types of polymerization systems, such as bulk radical polymerization, RAFT, ATRP, etc.
-* explicit treatment of the chain lengths of individual polymeric species;
+* explicit treatment of the chain lengths of individual polymer and complex species;
 * simulation of heating and cooling of the reaction mixture (by reaction energy or thermal dissipation);
 * simulation of autoacceleration kinetics (i.e. the gel effect).
 
