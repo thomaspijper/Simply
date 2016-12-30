@@ -1,0 +1,59 @@
+#
+# Bulk ATRP reaction of MMA. Based on that described by Radea and Zhu in "Modeling the influence of diffusion-controlled reactions
+# and residual termination and deactivation on the rate and control of bulk ATRP at high conversions", Polymers, 2015, 7, 819-835.
+# Residual termination and deactivation processes are not included.
+#
+
+begin general
+    particlecount       5e8
+    monomernames        M
+    maxsimtime          300
+    syncevents          5000000
+    seed                0
+    maxwalltime         30
+    maxconversion       0.80
+    temperature         343 
+    longchainsupport    1
+end general
+
+
+begin molecules
+    simple  RX       0.0488
+    simple  M        9.35
+    simple  R_star
+    simple  C        0.0244
+    simple  CX
+    poly    D
+    poly    P
+    poly    PX
+end molecules
+
+
+begin reactions
+    init_activation     kac     =   RX      +   C   ->  R_star  +   CX
+    init_deactivation   kde     =   R_star  +   CX  ->  RX      +   C
+    initiation          kp      =   R_star  +   M   ->  P
+    propagation         kp      =   P       +   M   ->  P
+    activation          kac     =   PX      +   C   ->  P       +   CX
+    deactivation        kde     =   P       +   CX  ->  PX      +   C
+    disproportionation  ktd     =   P       +   P   ->  D       +   D
+    combination         ktc     =   P       +   P   ->  D
+end reactions
+
+
+begin rates
+    kac     Fp    3.7        1e10     0   1
+    kde     Fpr   5.28e5     1e10     0   1    1050    M
+    kp      Fp    1051       1e16     0   1
+    ktd     Fpr   1e7        9.02e13  2   1    1028.4  M
+    ktc     Fpr   9.21e7     0.98e13  2   1    9471.6  M
+end rates
+
+
+begin freevolume
+    vf0     0.025
+    alphaM  0.001
+    alphaP  0.00048
+    TgM     167
+    TgP     378
+end freevolume

@@ -125,7 +125,7 @@ static const double coolingrate = COOLINGRATE;
 
 // Forced inlines
 FORCEINLINE_PRE static void updateTree(int prevReact) FORCEINLINE_POST;
-FORCEINLINE_PRE static int pickRndReaction() FORCEINLINE_POST;
+FORCEINLINE_PRE static int pickRndReaction(void) FORCEINLINE_POST;
 //FORCEINLINE_PRE static int pickRndChainLen(pcount *mwd_tree, int size) FORCEINLINE_POST;
 
 INLINE static pcount max_value(pcount x, pcount y) {
@@ -420,7 +420,7 @@ static void dumpTree(const mwdStore *x) {
 	}
 }
 
-static void dumpAllTrees() {
+static void dumpAllTrees(void) {
 	for (int i =0; i < NO_OF_MOLSPECS; i++) {
 		printf("%s:\n",name(i));
 		for (int a=0; a < state.arms[i]; a++) {
@@ -618,7 +618,7 @@ INLINE static void adjustMolCnt_order1(const int spec_ind, chainLen *lengths, in
 	}
 }
 
-INLINE static pcount monomerCount() {
+INLINE static pcount monomerCount(void) {
 	pcount cnt = 0;
 	for (int i = 0; i < MAXMONOMER; i++) {
 		cnt += state.ms_cnts[i];
@@ -642,7 +642,7 @@ static pcount getMolCnt(int spec_ind, int arm, int leave_ind) {
 	return cnt;
 }
 
-static void dumpReactProbTree() {
+static void dumpReactProbTree(void) {
 	int nextLev = 2;
 	for (int j=0; j<2*REACT_PROB_TREE_LEAVES-1; j++) {
 		printf (" %.40f",state.reactProbTree[j]);
@@ -921,7 +921,7 @@ static void file_write_debug(const char *str) {
 * This would probably pay off for systems with a higher number
 * of reactions.
 */
-INLINE static int pickRndReaction() {
+INLINE static int pickRndReaction(void) {
     probability	rate;
     int			i;
     probability	rnd, origRnd;

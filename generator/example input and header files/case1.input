@@ -1,0 +1,84 @@
+#
+# The test system described in Figure 5 of H. Chaffey-Millar, D. Stewart, M. M. T. Chakravarty, G. Keller, C. 
+# Barner-Kowollik, Macromol. Theory Simul. 2007, 16, 575-592.
+#
+
+begin general
+    particlecount  1E10
+    monomernames   M
+    maxsimtime     300
+    maxwalltime    30
+    calcdist       1
+    syncsimtime    5000
+end general
+
+
+begin molecules
+    simple   I           0.0012
+    simple   Junk
+    simple   I_Star
+    simple   M           8.17
+    simple   RAFTR       0.005
+    simple   R
+    poly     QpreChain
+    poly     QpreArm
+    poly     A_coupled
+    poly     Adead
+    poly     D   
+    poly     P_RAFT
+    poly     P
+    poly     A_RAFT
+    poly     A
+    complex  Q           2
+    complex  Qstar       2
+    complex  QstarStar   2
+end molecules
+
+
+begin reactions
+    decomposition       kd                  =    I                              ->    I_Star          +    I_Star
+    decompositionNot    kdNot               =    I                              ->    Junk            +    Junk
+    initiation          ki                  =    I_Star          +    M         ->    P  
+    reInitiation        krein               =    R               +    M         ->    A  
+    propagationP        kp                  =    M               +    P         ->    P 
+    propagationA        kp                  =    A               +    M         ->    A  
+    actAddP             kbetaPreChainRight  =    RAFTR           +    P         ->    QpreChain   
+    actAddA             kbetaPreArmRight    =    RAFTR           +    A         ->    QpreArm   
+    actFragPLeft        k_betaPreChainLeft  =    QpreChain                      ->    RAFTR           +    P     
+    actFragPRight       k_betaPreChainRight =    QpreChain                      ->    R               +    P_RAFT 
+    actFragALeft        k_betaPreArmLeft    =    QpreArm                        ->    RAFTR           +    A 
+    actFragARight       k_betaPreArmRight   =    QpreArm                        ->    R               +    A_RAFT
+    terminationAA       ktArmArm            =    A               +    A         ->    A_coupled  
+    terminationAP       ktArm               =    A               +    P         ->    Adead  
+    terminationPP       kt                  =    P               +    P         ->    D  
+    addRAFTPP           kbeta               =    P               +    P_RAFT    ->    Q
+    fragRAFT1PP         k_beta              =    Q[0]                           ->    P               +    P_RAFT
+    fragRAFT4PP         k_beta              =    Q[0]                           ->    P_RAFT          +    P
+    addRAFTAP           kbeta               =    A               +    P_RAFT    ->    Qstar
+    addRAFTAP1          kbeta               =    A_RAFT          +    P         ->    Qstar
+    fragRAFT1AP         k_beta              =    Qstar[0]                       ->    A               +    P_RAFT
+    fragRAFT2AP         k_beta              =    Qstar[0]                       ->    A_RAFT          +    P
+    addRAFTAA           kbeta               =    A               +    A_RAFT    ->    QstarStar
+    fragRAFT1AA         k_beta              =    QstarStar[0]                   ->    A               +    A_RAFT
+    fragRAFT2AA         k_beta              =    QstarStar[0]                   ->    A_RAFT          +    A
+end reactions
+
+
+begin rates
+    kd                  F   1.2608e-4
+    kdNot               F   7.092e-5
+    ki                  F   664
+    krein               F   664
+    kp                  F   664
+    kt                  F   1e8
+    ktArm               F   5e7 
+    ktArmArm            F   1e7
+    kbeta               F   5e5
+    k_beta              F   1e5
+    kbetaPreChainRight  F   1e5
+    kbetaPreArmRight    F   1e5
+    k_betaPreChainLeft  F   1e5
+    k_betaPreChainRight F   1e5
+    k_betaPreArmLeft    F   1e5
+    k_betaPreArmRight   F   1e5
+end rates
