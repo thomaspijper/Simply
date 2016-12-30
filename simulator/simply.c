@@ -2852,9 +2852,9 @@ int main(int argc, char *argv[]) {
 
 	// Define arrays for PRNG
 #if defined(__GNUC__)
-	w128_t dummy0 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1)*sizeof(w128_t));
-	w128_t dummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
-	w128_t logDummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+	w128_t *dummy0 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1)*sizeof(w128_t));
+	w128_t *dummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
+	w128_t *logDummy2 = memalign(16, (PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
 #elif defined (_MSC_VER) // MSVC automatically aligns _m128* types on 16-byte boundaries
 	w128_t *dummy0 = malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
 	w128_t *dummy2 = malloc((PRNG_ARRAY_SIZE / 2 + 1) * sizeof(w128_t));
